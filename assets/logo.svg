@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- deckwright logo mark (light backgrounds) -->
+<!-- DeckWright logo mark (light backgrounds) -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <rect x="58" y="62" width="396" height="34" rx="17" fill="#000405"/>
   <path d="M84 96H428V340A14 14 0 0 1 414 354H98A14 14 0 0 1 84 340Z" fill="#000405"/>

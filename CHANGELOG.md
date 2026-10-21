@@ -4,13 +4,17 @@ English · [한국어](CHANGELOG.ko.md)
 
 Versions follow SemVer. Dates are YYMMDD.
 
+### v0.1.2 (261021)
+
+- The name is written **DeckWright** again everywhere it is shown: README, guide, spec, player, presenter view, help, CLI messages. `inject` writes `<name>_DeckWright.html`. Commands, the package, the plugin and the repository stay lowercase (`deckwright`, `deckwright@deckwright`, `grotyx/deckwright`).
+- Screenshots retaken; the README author section is laid out one line per item.
+
 ### v0.1.1 (261021)
 
 Documentation and polish.
 
 - READMEs rewritten (English and Korean) with screenshots, a user guide in both languages (`docs/manual.md`, `docs/manual.ko.md`) and this changelog.
 - Logo (`assets/logo.svg`, `assets/logo-dark.svg`), used for the plugin icon and the GitHub Pages site.
-- The product name is written in lowercase, *deckwright*, in the interface and the docs. `inject` now writes `<name>_deckwright.html`. The JavaScript API stays `window.DeckWright`.
 - Fix: the runtime's own help card and toolbar used the class names `card`, `num`, `sw` and `swb`, so a deck's CSS for `.card` (common in AI decks) could stretch the shortcut help. They are now `hdek-card`, `hdek-num`, `hdek-sw` and `hdek-swb`.
 - Fix: a slide title written with `<br>` ("deckwright<br>presentation runtime") ran the words together in the slide list; line breaks now become spaces.
 - Demo deck: flip cards no longer print mirrored.

@@ -1,6 +1,6 @@
-# deckwright user guide
+# DeckWright user guide
 
-English · [한국어](manual.ko.md) · v0.1.1
+English · [한국어](manual.ko.md) · v0.1.2
 
 This guide walks through a talk from start to finish: installing, turning an HTML deck into one you can present, presenting with a second screen, writing on slides, and making the files a conference asks for.
 
@@ -36,14 +36,14 @@ You already have a deck an AI made, for example `talk.html` with an `img/` folde
 
 ```sh
 deckwright check  talk.html     # what it detects: slides, steps, notes, external files
-deckwright inject talk.html     # writes talk_deckwright.html next to talk.html
+deckwright inject talk.html     # writes talk_DeckWright.html next to talk.html
 ```
 
 `inject` copies the deck and adds the runtime. Images and video still load from the original folder, so keep the new file next to the old one. `talk.html` itself is never changed.
 
-You do not need to rewrite the deck. deckwright recognizes:
+You do not need to rewrite the deck. DeckWright recognizes:
 
-| Your deck | What deckwright does |
+| Your deck | What DeckWright does |
 |---|---|
 | Has its own arrow-key navigation (most AI "stage + scenes" decks) | Steers that engine with key presses, so the deck's own animations and steps play as designed |
 | Stacks fixed-size slides down the page (decks made for printing or PPT conversion) | Shows one slide at a time, scaled to fill the screen |
@@ -54,9 +54,9 @@ Notes come from `.notes`, `aside.notes` or `.speaker-notes` inside or right afte
 
 ## 3. Make a new deck with your AI
 
-Say what you need, for example: "Make a 15-minute conference talk on endoscopic decompression outcomes as a deckwright deck, 12 slides, notes on every slide."
+Say what you need, for example: "Make a 15-minute conference talk on endoscopic decompression outcomes as a DeckWright deck, 12 slides, notes on every slide."
 
-The skill writes the deck to the deckwright contract, checks it and builds one file. The contract is short:
+The skill writes the deck to the DeckWright contract, checks it and builds one file. The contract is short:
 
 ```html
 <main data-hdek data-width="1920" data-height="1080" data-duration="15" data-title="My talk">
@@ -146,10 +146,10 @@ Without the player, rename `talk.hdek` to `talk.zip`, extract it and double-clic
 
 **`F` does not move the window to the projector.** Drag the audience window onto the projector screen and press `F` there. In Chrome and Edge, allow "window management" when asked.
 
-**The clicker does nothing.** Click once on the audience or presenter window so it has focus. Most clickers send `PageDown` / `PageUp`, which deckwright understands.
+**The clicker does nothing.** Click once on the audience or presenter window so it has focus. Most clickers send `PageDown` / `PageUp`, which DeckWright understands.
 
 **The fonts look different at the venue.** The deck loads web fonts from the internet. Run `deckwright check`; then ask your AI to download the fonts into a `fonts/` folder and rebuild.
 
-**Slides advance twice, or a step is skipped.** The deck has its own key handler that deckwright did not recognize. Open an issue with the deck (or a trimmed copy) at <https://github.com/grotyx/deckwright/issues>.
+**Slides advance twice, or a step is skipped.** The deck has its own key handler that DeckWright did not recognize. Open an issue with the deck (or a trimmed copy) at <https://github.com/grotyx/deckwright/issues>.
 
 **The previews make the laptop slow.** Press *Preview* in the presenter view to turn off the live current-slide preview.

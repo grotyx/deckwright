@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
-    <img src="assets/logo.png" width="200" alt="deckwright, 강당 뒤편의 그 음향·영상 담당자">
+    <img src="assets/logo.png" width="200" alt="DeckWright, 강당 뒤편의 그 음향·영상 담당자">
   </picture>
 </p>
 
-<h1 align="center">deckwright</h1>
+<h1 align="center">DeckWright</h1>
 
 <p align="center">
   <em>슬라이드는 청중의 화면에, 노트는 내 화면에.</em>
@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.1.1-111111?style=flat-square" alt="Version 0.1.1">
+  <img src="https://img.shields.io/badge/version-0.1.2-111111?style=flat-square" alt="Version 0.1.2">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -34,7 +34,7 @@
 
 요즘 AI는 웬만한 PowerPoint보다 보기 좋은 슬라이드를 HTML로 만든다. 그런데 그 파일을 연단에서 열면 그 사람이 없다. 브라우저 탭 하나, 노트도 다음 슬라이드도 없고, 클리커를 누르면 페이지가 스크롤된다.
 
-deckwright 는 그 사람을 HTML 파일 안에 넣는다.
+DeckWright는 그 사람을 HTML 파일 안에 넣는다.
 
 <table>
   <tr>
@@ -49,13 +49,13 @@ deckwright 는 그 사람을 HTML 파일 안에 넣는다.
 
 ## 쓰기 전 / 쓴 후
 
-AI가 만든 `talk.html` 이 있다. deckwright 없이 더블클릭하면 브라우저 탭으로 발표하게 된다. 노트는 종이에 적어 두고, PageDown을 누르면 다음 장 대신 페이지가 내려가고, 뒤로 가면 애니메이션이 처음부터 다시 돈다.
+AI가 만든 `talk.html` 이 있다. DeckWright 없이 더블클릭하면 브라우저 탭으로 발표하게 된다. 노트는 종이에 적어 두고, PageDown을 누르면 다음 장 대신 페이지가 내려가고, 뒤로 가면 애니메이션이 처음부터 다시 돈다.
 
-deckwright 를 쓰면:
+DeckWright를 쓰면:
 
 ```text
 $ deckwright inject talk.html
-✓ talk_deckwright.html (double-click it next to the original)
+✓ talk_DeckWright.html (double-click it next to the original)
 ```
 
 새 파일을 더블클릭하고 `S` 를 누른 뒤, 청중 창을 프로젝터 쪽으로 끌어다 놓고 그 창에서 `F` 를 누른다. 노트북에는 현재 화면, 다음 단계, 노트, 시계가 보이고 프로젝터에는 슬라이드만 나간다. 원본 `talk.html` 은 그대로다.
@@ -69,7 +69,7 @@ $ deckwright inject talk.html
       └─▶ 발표자 창: 현재 · 다음 · 노트 · 타이머 · 펜, 노트북에
 
  런타임이 덱을 읽는 방식
-      ├─ deckwright 규약 덱: 단계와 노트를 정확히 (data-slide, data-step)
+      ├─ DeckWright 규약 덱: 단계와 노트를 정확히 (data-slide, data-step)
       ├─ 자체 이동 엔진이 있는 덱: 키로 조종, 덱의 애니메이션 그대로
       └─ 고정 크기 슬라이드 문서, reveal.js: 한 장씩 화면에 맞춰 보여 줌
 ```
@@ -112,8 +112,8 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 | 이렇게 말하면 | 이렇게 된다 |
 |---|---|
-| "이 HTML 덱 발표할 수 있게 해 줘" | 원본 옆에 런타임을 넣은 사본 `talk_deckwright.html` |
-| "OO 주제로 15분 발표를 deckwright 덱으로 만들어 줘" | 규약을 따르는 새 덱. 클릭 단계, 슬라이드마다 노트, 목표 시간. 점검 후 파일 하나로 빌드 |
+| "이 HTML 덱 발표할 수 있게 해 줘" | 원본 옆에 런타임을 넣은 사본 `talk_DeckWright.html` |
+| "OO 주제로 15분 발표를 DeckWright 덱으로 만들어 줘" | 규약을 따르는 새 덱. 클릭 단계, 슬라이드마다 노트, 목표 시간. 점검 후 파일 하나로 빌드 |
 | "메일로 보낼 수 있게 파일 하나로 만들어 줘" | 그림·폰트·영상을 모두 넣은 `.html` 한 개 |
 | ".hdek 으로 묶어 줘" | 영상이 큰 덱용 ZIP 패키지. 플레이어로 연다 |
 | "PDF랑 PPTX 백업 만들어 줘" | PPTX·PDF만 받는 학회용. 슬라이드별 최종 화면, 노트는 PPTX 노트로 |
@@ -175,7 +175,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 **`.hdek` 은 뭔가?** 매니페스트, 덱, 자원을 담은 ZIP이다. 슬라이드판 EPUB이라고 보면 된다. 확장자를 `.zip` 으로 바꾸면 어디서든 열린다.
 
-**왜 "deckwright" 인가?** Deck + *wright*. wright 는 playwright(극작가), shipwright(조선공)처럼 무언가를 공들여 만드는 사람을 뜻하는 옛말이다. 같은 저자의 [manuwright](https://github.com/grotyx/Academic_writing_c_claudecode), [Refwright](https://github.com/grotyx/rag-obsidian) 와 이름을 같이 쓴다.
+**왜 "DeckWright"인가?** Deck + *wright*. wright 는 playwright(극작가), shipwright(조선공)처럼 무언가를 공들여 만드는 사람을 뜻하는 옛말이다. 같은 저자의 [manuwright](https://github.com/grotyx/Academic_writing_c_claudecode), [Refwright](https://github.com/grotyx/rag-obsidian) 와 이름을 같이 쓴다.
 
 ## 알려진 한계
 
@@ -192,7 +192,11 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 ## 저자
 
-**박상민 교수, M.D., Ph.D.**, 정형외과학교실, 분당서울대학교병원, 서울대학교 의과대학. <https://sangmin.me/>
+**박상민 교수 (Sang-Min Park, M.D., Ph.D.)**<br>
+분당서울대학교병원 정형외과<br>
+서울대학교 의과대학<br>
+<sub>Department of Orthopaedic Surgery, Seoul National University Bundang Hospital, Seoul National University College of Medicine</sub><br>
+🌐 [sangmin.me](https://sangmin.me/)
 
 ## 라이선스
 

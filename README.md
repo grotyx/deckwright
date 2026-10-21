@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
-    <img src="assets/logo.png" width="200" alt="deckwright, the AV tech in the back of the hall">
+    <img src="assets/logo.png" width="200" alt="DeckWright, the AV tech in the back of the hall">
   </picture>
 </p>
 
-<h1 align="center">deckwright</h1>
+<h1 align="center">DeckWright</h1>
 
 <p align="center">
   <em>Your slides on their screen. Your notes on yours.</em>
@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.1.1-111111?style=flat-square" alt="Version 0.1.1">
+  <img src="https://img.shields.io/badge/version-0.1.2-111111?style=flat-square" alt="Version 0.1.2">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -34,7 +34,7 @@ You know him. The AV tech in the back of every well-run conference hall. Before 
 
 AI now writes slides in HTML that look better than most PowerPoint files. Open one at the podium, though, and he is gone: a browser tab, no notes, no next slide, a clicker that scrolls the page.
 
-deckwright puts him inside the HTML file.
+DeckWright puts him inside the HTML file.
 
 <table>
   <tr>
@@ -49,13 +49,13 @@ deckwright puts him inside the HTML file.
 
 ## Before / after
 
-You have `talk.html`, made by an AI. Without deckwright you double-click it and present from a browser tab. Your notes are on paper. PageDown scrolls the page instead of advancing. Going back replays every animation from the start.
+You have `talk.html`, made by an AI. Without DeckWright you double-click it and present from a browser tab. Your notes are on paper. PageDown scrolls the page instead of advancing. Going back replays every animation from the start.
 
-With deckwright:
+With DeckWright:
 
 ```text
 $ deckwright inject talk.html
-✓ talk_deckwright.html (double-click it next to the original)
+✓ talk_DeckWright.html (double-click it next to the original)
 ```
 
 Double-click the new file, press `S`, drag the audience window to the projector and press `F` there. Your laptop shows the current slide, the next step, your notes and the clock. The projector shows only the slides. The original `talk.html` is not touched.
@@ -69,7 +69,7 @@ Double-click the new file, press `S`, drag the audience window to the projector 
       └─▶ presenter window      current · next · notes · timer · pen, on your laptop
 
  how the runtime reads the deck
-      ├─ deckwright contract    exact steps and notes (data-slide, data-step)
+      ├─ DeckWright contract    exact steps and notes (data-slide, data-step)
       ├─ its own nav engine     steered by keys, the deck's animations kept
       └─ fixed-size slides,     one at a time, fitted to the screen
          reveal.js
@@ -113,8 +113,8 @@ npx skills add grotyx/deckwright -g     # every project
 
 | Say | What happens |
 |---|---|
-| "make this HTML deck presentable" | A copy with the runtime, `talk_deckwright.html`, next to the original |
-| "make a 15-minute talk on X as a deckwright deck" | A new deck that follows the contract: click steps, notes on every slide, a time target, checked and built into one file |
+| "make this HTML deck presentable" | A copy with the runtime, `talk_DeckWright.html`, next to the original |
+| "make a 15-minute talk on X as a DeckWright deck" | A new deck that follows the contract: click steps, notes on every slide, a time target, checked and built into one file |
 | "make it one file I can email" | Every image, font and video inlined into a single `.html` |
 | "package it as .hdek" | A ZIP package for decks with large videos, opened with the player |
 | "export a PDF and PPTX backup" | For conferences that only take PPTX or PDF: each slide's final look, notes in the PPTX notes |
@@ -176,7 +176,7 @@ Effects, JS hooks for counters and charts, events, the `.hdek` format and how ot
 
 **What is `.hdek`?** A ZIP with a manifest, the deck and its assets, like EPUB for slides. Rename it to `.zip` and it opens anywhere.
 
-**Why "deckwright"?** Deck + *wright*, an old word for a maker: playwright, shipwright. Someone who builds decks carefully. It shares the name with [manuwright](https://github.com/grotyx/Academic_writing_c_claudecode) and [Refwright](https://github.com/grotyx/rag-obsidian) by the same author.
+**Why "DeckWright"?** Deck + *wright*, an old word for a maker: playwright, shipwright. Someone who builds decks carefully. It shares the name with [manuwright](https://github.com/grotyx/Academic_writing_c_claudecode) and [Refwright](https://github.com/grotyx/rag-obsidian) by the same author.
 
 ## Known limits
 
@@ -193,7 +193,11 @@ Development: `npm run build` rebuilds the player, demo and skill zip; `npm test`
 
 ## Author
 
-**Professor Sang-Min Park, M.D., Ph.D.**, Department of Orthopaedic Surgery, Seoul National University Bundang Hospital, Seoul National University College of Medicine. <https://sangmin.me/>
+**Professor Sang-Min Park, M.D., Ph.D.**<br>
+Department of Orthopaedic Surgery<br>
+Seoul National University Bundang Hospital<br>
+Seoul National University College of Medicine<br>
+🌐 [sangmin.me](https://sangmin.me/)
 
 ## License
 

@@ -1,4 +1,4 @@
-/*! deckwright runtime v0.1.1 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright runtime v0.1.2 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -6,8 +6,8 @@
   'use strict';
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
-  var PRODUCT = 'deckwright';
-  var VERSION = '0.1.1';
+  var PRODUCT = 'DeckWright';
+  var VERSION = '0.1.2';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 

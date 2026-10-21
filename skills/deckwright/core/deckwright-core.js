@@ -1,4 +1,4 @@
-/*! deckwright core v0.1.1 | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright core v0.1.2 | MIT License | https://github.com/grotyx/deckwright
  *  Shared by player.html (browser) and the CLI (Node):
  *  runtime injection, local asset inlining, .hdek (ZIP) read/write, manifest, static checks.
  */

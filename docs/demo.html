@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>deckwright demo</title>
+<title>DeckWright demo</title>
 <style>
   :root{
     --bg:#0b1020; --ink:#eef1f8; --muted:#9aa4bd; --accent:#4cc2ff; --accent2:#ffb547; --good:#3ddc97;
@@ -61,14 +61,14 @@
   @media print{.card .b{display:none}} /* 3D flip faces do not print reliably */
   kbd{font:600 30px ui-monospace,Menlo,Consolas,monospace;padding:4px 14px;border-radius:10px;background:#ffffff1a;border:1px solid #ffffff33}
 </style>
-<script type="application/hdek+json" id="hdek-manifest">{"format":"hdek/1","generator":"deckwright","title":"deckwright demo","entry":"index.html","created":"2026-10-21T09:36:58.086Z","stage":{"width":1920,"height":1080,"fit":"contain"},"duration":10,"slides":[{"id":"title","title":"deckwright presentation runtime","steps":0},{"id":"steps","title":"One click, one step","steps":5},{"id":"numbers","title":"Numbers and charts as steps","steps":2},{"id":"draw","title":"SVG line drawing","steps":1},{"id":"interactive","title":"Clickable things stay put","steps":0},{"id":"swap","title":"Appear, then leave","steps":2},{"id":"end","title":"Thank you","steps":0}]}</script>
+<script type="application/hdek+json" id="hdek-manifest">{"format":"hdek/1","generator":"deckwright","title":"DeckWright demo","entry":"index.html","created":"2026-10-21T10:02:54.515Z","stage":{"width":1920,"height":1080,"fit":"contain"},"duration":10,"slides":[{"id":"title","title":"DeckWright presentation runtime","steps":0},{"id":"steps","title":"One click, one step","steps":5},{"id":"numbers","title":"Numbers and charts as steps","steps":2},{"id":"draw","title":"SVG line drawing","steps":1},{"id":"interactive","title":"Clickable things stay put","steps":0},{"id":"swap","title":"Appear, then leave","steps":2},{"id":"end","title":"Thank you","steps":0}]}</script>
 </head>
 <body>
-<main class="deck" data-hdek data-width="1920" data-height="1080" data-duration="10" data-title="deckwright demo">
+<main class="deck" data-hdek data-width="1920" data-height="1080" data-duration="10" data-title="DeckWright demo">
 
   <section data-slide="title" class="s-title">
     <span class="tag">Plain HTML, presented like PowerPoint</span>
-    <h1>deckwright<br>presentation runtime</h1>
+    <h1>DeckWright<br>presentation runtime</h1>
     <p class="lead">Advance with →, click, wheel or a clicker · <kbd>S</kbd> presenter view · <kbd>?</kbd> help</p>
     <div class="orb"></div>
     <aside class="notes">This is the title slide. The rising title animation replays every time you enter the slide.
@@ -169,7 +169,7 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
 </script>
 
 <script data-hdek-runtime>
-/*! deckwright runtime v0.1.1 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright runtime v0.1.2 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -177,8 +177,8 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
   'use strict';
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
-  var PRODUCT = 'deckwright';
-  var VERSION = '0.1.1';
+  var PRODUCT = 'DeckWright';
+  var VERSION = '0.1.2';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 

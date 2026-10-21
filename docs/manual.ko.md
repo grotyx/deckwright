@@ -1,6 +1,6 @@
-# deckwright 사용 설명서
+# DeckWright 사용 설명서
 
-[English](manual.md) · 한국어 · v0.1.1
+[English](manual.md) · 한국어 · v0.1.2
 
 발표 하나를 처음부터 끝까지 따라간다. 설치하고, HTML 덱을 발표할 수 있게 만들고, 두 화면으로 발표하고, 슬라이드에 필기하고, 학회가 요구하는 파일을 만드는 순서다.
 
@@ -36,14 +36,14 @@ AI가 만든 덱이 이미 있다고 하자. 예를 들어 `talk.html` 과 그 �
 
 ```sh
 deckwright check  talk.html     # 인식 결과: 슬라이드, 단계, 노트, 외부 파일
-deckwright inject talk.html     # talk.html 옆에 talk_deckwright.html 생성
+deckwright inject talk.html     # talk.html 옆에 talk_DeckWright.html 생성
 ```
 
 `inject` 는 덱을 복사하고 런타임을 넣는다. 그림과 영상은 원래 폴더에서 읽으므로 새 파일을 원본 옆에 두면 된다. `talk.html` 자체는 바뀌지 않는다.
 
-덱을 다시 만들 필요는 없다. deckwright 는 이런 덱을 알아본다.
+덱을 다시 만들 필요는 없다. DeckWright는 이런 덱을 알아본다.
 
-| 내 덱이 | deckwright 는 |
+| 내 덱이 | DeckWright는 |
 |---|---|
 | 자체 방향키 이동 기능이 있다 (AI가 만든 "무대 + 장면" 덱 대부분) | 키 입력으로 그 엔진을 조종한다. 덱이 만든 애니메이션과 단계가 그대로 돈다 |
 | 고정 크기 슬라이드를 세로로 쌓아 두었다 (인쇄용, PPT 변환용) | 한 번에 한 장씩, 화면에 꽉 차게 보여 준다 |
@@ -54,9 +54,9 @@ deckwright inject talk.html     # talk.html 옆에 talk_deckwright.html 생성
 
 ## 3. AI로 새 덱 만들기
 
-필요한 것을 말하면 된다. 예: "내시경 감압술 결과로 15분 학회 발표를 deckwright 덱으로 만들어 줘. 12장, 슬라이드마다 노트."
+필요한 것을 말하면 된다. 예: "내시경 감압술 결과로 15분 학회 발표를 DeckWright 덱으로 만들어 줘. 12장, 슬라이드마다 노트."
 
-스킬이 deckwright 규약에 맞춰 덱을 쓰고, 점검하고, 파일 하나로 빌드한다. 규약은 짧다.
+스킬이 DeckWright 규약에 맞춰 덱을 쓰고, 점검하고, 파일 하나로 빌드한다. 규약은 짧다.
 
 ```html
 <main data-hdek data-width="1920" data-height="1080" data-duration="15" data-title="발표 제목">
@@ -146,10 +146,10 @@ deckwright pack talk/ -o talk.hdek
 
 **`F` 를 눌러도 프로젝터로 옮겨지지 않는다.** 청중 창을 프로젝터 화면으로 끌어다 놓고 거기서 `F`. Chrome·Edge 에서는 "창 관리" 권한을 묻으면 허용한다.
 
-**클리커가 안 먹힌다.** 청중 창이나 발표자 창을 한 번 클릭해 포커스를 준다. 클리커 대부분은 `PageDown`·`PageUp` 을 보내고 deckwright 는 이를 알아듣는다.
+**클리커가 안 먹힌다.** 청중 창이나 발표자 창을 한 번 클릭해 포커스를 준다. 클리커 대부분은 `PageDown`·`PageUp` 을 보내고 DeckWright는 이를 알아듣는다.
 
 **학회장에서 글꼴이 달라 보인다.** 덱이 인터넷에서 웹폰트를 불러오고 있다. `deckwright check` 로 확인한 뒤 AI에게 폰트를 `fonts/` 폴더에 받아 넣고 다시 빌드해 달라고 한다.
 
-**두 장씩 넘어가거나 단계를 건너뛴다.** deckwright 가 알아보지 못한 키 처리 코드가 덱에 있다. 덱(또는 줄인 사본)과 함께 <https://github.com/grotyx/deckwright/issues> 에 알려 주면 고친다.
+**두 장씩 넘어가거나 단계를 건너뛴다.** DeckWright가 알아보지 못한 키 처리 코드가 덱에 있다. 덱(또는 줄인 사본)과 함께 <https://github.com/grotyx/deckwright/issues> 에 알려 주면 고친다.
 
 **미리보기 때문에 노트북이 느리다.** 발표자 창의 *미리보기* 버튼으로 현재 화면 실시간 미리보기를 끈다.

@@ -103,7 +103,7 @@ with sync_playwright() as pw:
     pg.goto(url(os.path.join(DIST, 'ai-style.html'))); pg.wait_for_timeout(500)
     s = pg.evaluate('DeckWright.state()')
     check('heuristic mode, 4 slides', s['mode'] == 'heuristic' and s['count'] == 4, s)
-    check('.notes used as speaker notes', 'knows nothing about deckwright' in pg.evaluate('DeckWright.slides()[0].notes'))
+    check('.notes used as speaker notes', 'knows nothing about DeckWright' in pg.evaluate('DeckWright.slides()[0].notes'))
     for _ in range(3): pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(120)
     s = pg.evaluate('DeckWright.state()')
     check('.fragment as steps (slide 3, step 1)', s['slide'] == 2 and s['step'] == 1, s)
