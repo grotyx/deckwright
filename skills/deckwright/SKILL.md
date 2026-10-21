@@ -18,15 +18,15 @@ player.html                   drag-and-drop player for .hdek files and folders
 reference/SPEC.md             full specification
 ```
 
-Run the CLI as `node <this skill folder>/scripts/deckwright.mjs <command> …`. If `deckwright` is on PATH (npm install), you can call it directly.
+Run the CLI as `node <skill>/scripts/deckwright.mjs <command> …`, where `<skill>` is the absolute path of this folder; it works from any working directory. If `deckwright` is on PATH (npm install), you can call it directly.
 
 ## Pick the job
 
 **A. The user already has an HTML deck** (made by any AI or by hand, no DeckWright markup):
 
-1. `node scripts/deckwright.mjs check <deck.html or folder>` to see what it detects (slides, external assets).
-2. `node scripts/deckwright.mjs inject <deck.html>` writes `<name>_DeckWright.html` next to the original. It only adds the runtime; images and videos still load from the original folder, and the original file is not touched. This is the lightest option and the right default.
-3. If the user wants one file to email or carry on USB: `build <input> -o talk.html` (inlines all assets). If the deck has large videos (>50 MB total): `pack <input> -o talk.hdek` and open it with `player.html`.
+1. `node <skill>/scripts/deckwright.mjs check <deck.html or folder>` to see what it detects (slides, external assets).
+2. `node <skill>/scripts/deckwright.mjs inject <deck.html>` writes `<name>_DeckWright.html` next to the original. It only adds the runtime; images and videos still load from the original folder, and the original file is not touched. This is the lightest option and the right default.
+3. If the user wants one file to email or carry on USB: `build <input>` (inlines all assets; writes `<name>_single.html` next to the input). If the deck has large videos (>50 MB total): `pack <input> -o talk.hdek` and open it with `player.html`.
 
 The runtime auto-detects decks without the contract: decks with their own navigation engine are driven through that engine (their animations are kept), stacked fixed-size slides are scaled to fit, reveal.js decks are recognized, and `.notes` / `aside.notes` become speaker notes. Never rewrite the user's deck just to add DeckWright unless they ask.
 
@@ -42,9 +42,9 @@ The runtime auto-detects decks without the contract: decks with their own naviga
      img/  media/  fonts/   (only what you need)
    ```
 3. Write slides following the rules below.
-4. `node scripts/deckwright.mjs check my-talk` and fix every warning.
-5. `node scripts/deckwright.mjs build my-talk -o my-talk.html` for a single self-contained HTML. Use `pack … -o my-talk.hdek` instead when videos make it large.
-6. For a conference that only accepts PPTX/PDF: `node scripts/deckwright.mjs export my-talk --pdf my-talk.pdf --pptx my-talk.pptx` (needs `npm i -g playwright pptxgenjs` and `npx playwright install chromium`). Each slide's final state becomes an image; notes go into PPTX notes.
+4. `node <skill>/scripts/deckwright.mjs check my-talk` and fix every warning.
+5. `node <skill>/scripts/deckwright.mjs build my-talk -o my-talk.html` for a single self-contained HTML. Files outside the deck folder are never included; if `check` or `build` reports one, move it into the folder (or pass `--root <parent>`). Use `pack … -o my-talk.hdek` instead when videos make it large.
+6. For a conference that only accepts PPTX/PDF: `node <skill>/scripts/deckwright.mjs export my-talk --pdf my-talk.pdf --pptx my-talk.pptx` (needs `npm i -g playwright pptxgenjs` and `npx playwright install chromium`). Each slide's final state becomes an image; notes go into PPTX notes.
 
 ## Rules
 

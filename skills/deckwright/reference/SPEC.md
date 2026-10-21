@@ -114,7 +114,9 @@ css/ img/ media/ fonts/ ...
 }
 ```
 
-Open a `.hdek` with `player.html` (no install) or the `deckwright` CLI. You can also rename it to `.zip`, extract it, and double-click `index.html`.
+Open a `.hdek` with `player.html` (no install) or the `deckwright` CLI. You can also rename it to `.zip`, extract it, and double-click the entry HTML (`entry` in the manifest).
+
+Readers must treat a package as untrusted input: entry names that leave the package (`../`) are dropped, entry and total sizes are capped, and sizes and CRCs are checked. Names without the UTF-8 flag that are not valid UTF-8 are read as CP949 (Korean Windows zip tools).
 
 ## 5. Runtime behavior
 

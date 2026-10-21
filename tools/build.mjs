@@ -30,7 +30,9 @@ for (const out of [path.join(dist, 'player.html'), path.join(SKILL, 'player.html
 fs.copyFileSync(path.join(ROOT, runtimePath), path.join(dist, 'deckwright-runtime.js'));
 
 const cli = path.join(SKILL, 'scripts', 'deckwright.mjs');
-const run = (...a) => execFileSync(process.execPath, [cli, ...a], { stdio: 'inherit', cwd: ROOT });
+// Fixed timestamps so rebuilding without changes leaves docs/ untouched
+const EPOCH = process.env.SOURCE_DATE_EPOCH || '1767225600'; // 2026-01-01T00:00:00Z
+const run = (...a) => execFileSync(process.execPath, [cli, ...a], { stdio: 'inherit', cwd: ROOT, env: { ...process.env, SOURCE_DATE_EPOCH: EPOCH } });
 run('build', 'examples/demo', '-o', 'dist/demo.html');
 run('pack', 'examples/demo', '-o', 'dist/demo.hdek');
 run('build', 'examples/ai-style/index.html', '-o', 'dist/ai-style.html');
@@ -49,7 +51,7 @@ const entries = [];
     else entries.push({ name: 'deckwright/' + r, bytes: new Uint8Array(fs.readFileSync(abs)) });
   }
 })(SKILL, '');
-const skillZip = Core.writeZip(entries, (b) => new Uint8Array(zlib.deflateRawSync(b, { level: 9 })));
+const skillZip = Core.writeZip(entries, (b) => new Uint8Array(zlib.deflateRawSync(b, { level: 9 })), { date: new Date(parseInt(EPOCH, 10) * 1000) });
 fs.writeFileSync(path.join(docs, 'deckwright-skill.zip'), skillZip);
 fs.writeFileSync(path.join(dist, 'deckwright-skill.zip'), skillZip);
 console.log('✓ deckwright-skill.zip (' + Math.round(skillZip.length / 1024) + ' KB, ' + entries.length + ' files) → docs/, dist/');

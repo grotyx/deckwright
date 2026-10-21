@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.1.2-111111?style=flat-square" alt="Version 0.1.2">
+  <img src="https://img.shields.io/badge/version-0.2.0-111111?style=flat-square" alt="Version 0.2.0">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -140,14 +140,14 @@ The interface follows the browser language (English or Korean).
 | Command | What it does |
 |---|---|
 | `deckwright inject <file.html>` | Adds the runtime to a copy next to the original; images and video still load from the original folder |
-| `deckwright build <input> -o talk.html` | One self-contained HTML with the runtime and every asset |
-| `deckwright pack <input> -o talk.hdek` | `.hdek` package (ZIP) for large videos or many files |
+| `deckwright build <input> [-o talk.html]` | One self-contained HTML with the runtime and every asset (default `<name>_single.html` next to the input) |
+| `deckwright pack <input> [-o talk.hdek]` | `.hdek` package (ZIP) for large videos or many files |
 | `deckwright unpack <talk.hdek> -o dir` | Extract a package |
 | `deckwright check <input>` | Slides, steps, notes, external references and missing files |
-| `deckwright export <input> --pdf --pptx --png` | Final state of each slide as PDF, PPTX or PNG (needs Playwright) |
+| `deckwright export <input> --pdf a.pdf --pptx a.pptx --png dir/` | Final state of each slide as PDF, PPTX or PNG (needs Playwright; `--wait 400` ms per slide) |
 | `deckwright runtime -o file.js` | The runtime script on its own |
 
-`<input>` is an HTML file, a folder with `index.html`, or a `.hdek` file. Without a global install, run `node skills/deckwright/scripts/deckwright.mjs` from the repository or the installed skill folder.
+`<input>` is an HTML file, a folder with `index.html`, or a `.hdek` file. Files outside the deck's folder are never read; if a deck uses images from a parent folder, add `--root <that folder>`. Without a global install, run `node skills/deckwright/scripts/deckwright.mjs` from the repository or the installed skill folder.
 
 ## The contract
 
@@ -184,12 +184,13 @@ Effects, JS hooks for counters and charts, events, the `.hdek` format and how ot
 - The presenter previews load the deck twice more. On a very heavy deck, turn the live preview off with the *Preview* button.
 - Video position is not synced between the projector and the previews (preview video is muted).
 - An animation the deck runs with its own `setTimeout` cannot be finished instantly when going back; the contract's `setStep` hook can.
+- The player runs a deck's scripts on its own page, the same as opening the HTML file directly. Open decks from people you trust.
 
 ## Documentation
 
 [User guide](docs/manual.md) &middot; [Spec (hdek/1)](SPEC.md) &middot; [Skill instructions](skills/deckwright/SKILL.md) &middot; [Changelog](CHANGELOG.md)
 
-Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 61 browser checks (Playwright for Python, `pdfplumber`, `python-pptx`).
+Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 87 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
 
 ## Author
 

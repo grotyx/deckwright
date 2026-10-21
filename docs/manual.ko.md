@@ -1,6 +1,6 @@
 # DeckWright 사용 설명서
 
-[English](manual.md) · 한국어 · v0.1.2
+[English](manual.md) · 한국어 · v0.2.0
 
 발표 하나를 처음부터 끝까지 따라간다. 설치하고, HTML 덱을 발표할 수 있게 만들고, 두 화면으로 발표하고, 슬라이드에 필기하고, 학회가 요구하는 파일을 만드는 순서다.
 
@@ -115,7 +115,7 @@ Chrome, Edge, Firefox, Safari 중 하나로 파일을 연다.
 
 | 학회가 원하는 것 | 만드는 방법 |
 |---|---|
-| 내 노트북, 내 HTML | `deckwright build talk.html -o talk-final.html`: 그림·폰트·영상을 모두 넣은 파일 하나. USB에도 한 부 |
+| 내 노트북, 내 HTML | `deckwright build talk.html`: 그림·폰트·영상을 모두 넣은 파일 하나(`talk_single.html`). USB에도 한 부 |
 | PDF 유인물 | 브라우저에서 `Ctrl/⌘+P` (*PDF로 저장*), 또는 `deckwright export talk.html --pdf talk.pdf` |
 | PPTX 업로드 | `deckwright export talk.html --pptx talk.pptx`: 슬라이드별 최종 화면을 그림으로, 노트는 PPTX 노트로 |
 | 슬라이드 그림 | `deckwright export talk.html --png shots/` |
@@ -138,7 +138,7 @@ deckwright pack talk/ -o talk.hdek
 
 ![플레이어](images/ko/player.png)
 
-플레이어 없이 쓰려면 `talk.hdek` 을 `talk.zip` 으로 이름을 바꿔 풀고 `index.html` 을 더블클릭한다.
+플레이어 없이 쓰려면 `talk.hdek` 을 `talk.zip` 으로 이름을 바꿔 풀고 덱의 HTML 파일(`manifest.json` 의 `entry`)을 더블클릭한다.
 
 ## 8. 문제가 생겼을 때
 
@@ -151,5 +151,7 @@ deckwright pack talk/ -o talk.hdek
 **학회장에서 글꼴이 달라 보인다.** 덱이 인터넷에서 웹폰트를 불러오고 있다. `deckwright check` 로 확인한 뒤 AI에게 폰트를 `fonts/` 폴더에 받아 넣고 다시 빌드해 달라고 한다.
 
 **두 장씩 넘어가거나 단계를 건너뛴다.** DeckWright가 알아보지 못한 키 처리 코드가 덱에 있다. 덱(또는 줄인 사본)과 함께 <https://github.com/grotyx/deckwright/issues> 에 알려 주면 고친다.
+
+**`build` 가 "덱 폴더 밖이라 넣지 않음" 이라고 한다.** 덱이 자기 폴더 위쪽의 파일(`../images/x.png`)을 가리킨다. 공유할 파일에 개인 파일이 딸려 들어가지 않도록 DeckWright는 덱 폴더 밖을 읽지 않는다. 파일을 덱 폴더 안으로 옮기거나, 공통 상위 폴더를 `--root` 로 알려 준다: `deckwright build talk/ --root .`
 
 **미리보기 때문에 노트북이 느리다.** 발표자 창의 *미리보기* 버튼으로 현재 화면 실시간 미리보기를 끈다.

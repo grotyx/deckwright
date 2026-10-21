@@ -1,6 +1,6 @@
 # DeckWright user guide
 
-English · [한국어](manual.ko.md) · v0.1.2
+English · [한국어](manual.ko.md) · v0.2.0
 
 This guide walks through a talk from start to finish: installing, turning an HTML deck into one you can present, presenting with a second screen, writing on slides, and making the files a conference asks for.
 
@@ -115,7 +115,7 @@ Ink drawn in the presenter view appears on the projector and the other way round
 
 | The conference wants | Make it with |
 |---|---|
-| Your own laptop, your HTML | `deckwright build talk.html -o talk-final.html`: one file with every image, font and video inside. Copy it to a USB stick as well |
+| Your own laptop, your HTML | `deckwright build talk.html`: one file, `talk_single.html`, with every image, font and video inside. Copy it to a USB stick as well |
 | A PDF handout | `Ctrl/⌘+P` in the browser (choose *Save as PDF*), or `deckwright export talk.html --pdf talk.pdf` |
 | A PPTX upload | `deckwright export talk.html --pptx talk.pptx`: each slide's final look as an image, with your notes in the PPTX notes |
 | Slide images | `deckwright export talk.html --png shots/` |
@@ -138,7 +138,7 @@ A `.hdek` file is a ZIP holding a manifest, the deck and its assets. Open it wit
 
 ![Player](images/en/player.png)
 
-Without the player, rename `talk.hdek` to `talk.zip`, extract it and double-click `index.html`.
+Without the player, rename `talk.hdek` to `talk.zip`, extract it and double-click the deck's HTML file (the `entry` named in `manifest.json`).
 
 ## 8. Troubleshooting
 
@@ -151,5 +151,7 @@ Without the player, rename `talk.hdek` to `talk.zip`, extract it and double-clic
 **The fonts look different at the venue.** The deck loads web fonts from the internet. Run `deckwright check`; then ask your AI to download the fonts into a `fonts/` folder and rebuild.
 
 **Slides advance twice, or a step is skipped.** The deck has its own key handler that DeckWright did not recognize. Open an issue with the deck (or a trimmed copy) at <https://github.com/grotyx/deckwright/issues>.
+
+**`build` says "Outside the deck folder, not included".** The deck points at a file above its own folder (`../images/x.png`). DeckWright never reads outside the deck folder, so nothing private is swept into a file you share. Move the file into the deck folder, or name the shared parent with `--root`: `deckwright build talk/ --root .`
 
 **The previews make the laptop slow.** Press *Preview* in the presenter view to turn off the live current-slide preview.

@@ -49,7 +49,7 @@ with sync_playwright() as pw:
     check('clicking empty space advances', st()['slide'] == 5)
     pg.mouse.wheel(0, 150); pg.wait_for_timeout(150)
     check('wheel down = next step', st()['step'] == 1, st())
-    pg.keyboard.press('b'); check('B = black screen', pg.evaluate("document.querySelector('.hdek-blank').classList.contains('on')"))
+    pg.keyboard.press('b'); check('B = black screen', pg.evaluate("document.querySelector('.hdek-blank').classList.contains('hdek-blank-on')"))
     pg.keyboard.press('b')
     check('position stored in URL hash', pg.evaluate('location.hash') == '#6.1', pg.evaluate('location.hash'))
 
@@ -123,9 +123,9 @@ with sync_playwright() as pw:
     for _ in range(4): pg.keyboard.press('ArrowRight'); pg.wait_for_timeout(80); seq.append(st())
     check('→ handled by deck engine, state tracked', seq == [[0, 1], [0, 2], [1, 0], [1, 1]], seq)
     check('matches deck\'s own counter', pg.inner_text('#count') == '2/4')
-    pg.keyboard.press('ArrowDown'); pg.wait_for_timeout(150)
+    pg.keyboard.press('ArrowDown'); pg.wait_for_timeout(500)  # the deck gets ~300 ms to react first
     check('↓ (unknown to deck) handled by runtime', st() == [2, 0], st())
-    pg.mouse.click(900, 400); pg.wait_for_timeout(150)
+    pg.mouse.click(900, 400); pg.wait_for_timeout(500)
     check('click handled by deck: no double move', st() == [3, 0], st())
     pg.keyboard.type('4'); pg.keyboard.press('Enter'); pg.wait_for_timeout(150)
     check('number jump: deck does not also handle Enter', st() == [3, 0], st())
@@ -175,7 +175,80 @@ with sync_playwright() as pw:
     pg2.set_input_files('#dir', fx); pg2.wait_for_selector('#info', state='visible')
     check('open folder: warns about external web font', 'fonts.googleapis.com' in pg2.inner_text('#issues'))
     pg2.click('#start'); pg2.wait_for_timeout(800)
+    pg3 = ctx.new_page(); pg3.goto(url(os.path.join(DIST, 'player.html')))
+    pg3.set_input_files('#file', os.path.join(DIST, 'demo.hdek')); pg3.wait_for_selector('#info', state='visible')
+    bad = os.path.join(TMP, 'bad.hdek'); open(bad, 'wb').write(open(os.path.join(DIST, 'demo.hdek'), 'rb').read()[:4000])
+    pg3.set_input_files('#file', bad); pg3.wait_for_timeout(600)
+    check('player: a failed load hides the previous deck', not pg3.is_visible('#info') and pg3.is_visible('#err'), pg3.inner_text('#err'))
     check('folder deck: CSS fonts/backgrounds inlined', pg2.evaluate("getComputedStyle(document.querySelector('section')).backgroundImage.startsWith('url(\"data:image/png')"))
+    ctx.close()
+
+    # ------------------------------------------------------------ regressions from the code review
+    print('Review regressions (runtime)')
+    def built(fx):
+        out = os.path.join(TMP, fx + '.html'); r = cli('build', 'test/fixtures/' + fx, '-o', out)
+        assert r.returncode == 0, r.stderr
+        return out
+    # driver deck that ignores keys during its 500 ms transition: number+Enter must still land on slide 4
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(built('lock-engine'))); pg.wait_for_function('window.DeckWright && DeckWright.state().count>1')
+    pg.keyboard.type('4'); pg.keyboard.press('Enter'); pg.wait_for_timeout(6000)
+    st = pg.evaluate('[DeckWright.state().slide, DeckWright.state().step]')
+    check('driver jump waits for a deck that locks keys during transitions', st[0] == 3, st)
+    ctx.close()
+    # driver deck that navigates on keyup: one press = one step
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(built('keyup-engine'))); pg.wait_for_function('window.DeckWright && DeckWright.state().count>1')
+    seq = []
+    for _ in range(3):
+        pg.keyboard.down('ArrowRight'); pg.wait_for_timeout(90); pg.keyboard.up('ArrowRight'); pg.wait_for_timeout(450)
+        seq.append(pg.evaluate('[DeckWright.state().slide, DeckWright.state().step]'))
+    check('keyup-driven deck: no double advance', seq == [[0, 1], [0, 2], [1, 0]], seq)
+    ctx.close()
+    # heuristic deck with its own document click handler: one click = one move, slide stays visible
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(built('ai-click'))); pg.wait_for_timeout(800)
+    for _ in range(3): pg.mouse.click(1100, 650); pg.wait_for_timeout(700)
+    vis = pg.evaluate('(()=>{const c=document.querySelector(".hdek-current");return [DeckWright.state().slide, getComputedStyle(c).opacity, document.querySelectorAll(".slide.active").length]})()')
+    check('heuristic click is not handled twice (deck click handler)', vis[1] == '1' and vis[2] == 1, vis)
+    # one trackpad fling (momentum) = one step
+    s0 = pg.evaluate('JSON.stringify(DeckWright.state())')
+    for k in range(60): pg.mouse.wheel(0, max(1, 60 - k)); pg.wait_for_timeout(30)
+    s1 = pg.evaluate('DeckWright.state()'); s0 = json.loads(s0)
+    check('one trackpad fling advances once', (s1['slide'] * 10 + s1['step']) - (s0['slide'] * 10 + s0['step']) in (1, 10 - s0['step']), (s0, s1))
+    ctx.close()
+    # deck CSS must not reach the runtime UI
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(os.path.join(DIST, 'demo.html'))); pg.wait_for_timeout(400)
+    pg.add_style_tag(content='td{color:#333;font-size:28px} table{background:#fff} h3{font-size:56px} button{background:red!important}')
+    pg.keyboard.press('?'); pg.wait_for_timeout(200)
+    css = pg.evaluate('(()=>{const r=document.querySelector(".hdek-ui-host").shadowRoot;return [getComputedStyle(r.querySelector(".hdek-help td")).color,getComputedStyle(r.querySelector(".hdek-help h3")).fontSize]})()')
+    check('deck CSS does not leak into the help card', css == ['rgb(255, 255, 255)', '17px'], css)
+    pg.keyboard.press('Escape')
+    # stylus writes on the first stroke without picking a tool, and the stroke does not advance the slide
+    cdp = ctx.new_cdp_session(pg)
+    def pen(t, x, y, b=1): cdp.send('Input.dispatchMouseEvent', {'type': t, 'x': x, 'y': y, 'button': 'left' if b else 'none', 'buttons': b, 'clickCount': 1, 'pointerType': 'pen'})
+    before = pg.evaluate('DeckWright.state().slide')
+    for i in range(2):
+        pen('mouseMoved', 300, 300 + i * 60, 0); pen('mousePressed', 300, 300 + i * 60)
+        for k in range(1, 12): pen('mouseMoved', 300 + k * 10, 300 + i * 60 + k * 3)
+        pen('mouseReleased', 410, 333 + i * 60); pg.wait_for_timeout(150)
+    ink = pg.evaluate('Object.values(DeckWright.ink()).reduce((a,v)=>a+v.length,0)')
+    check('stylus: every stroke draws, none advances', ink == 2 and pg.evaluate('DeckWright.state().slide') == before, (ink, before))
+    # PageDown works while the presenter's minutes box has focus
+    with ctx.expect_page() as pi: pg.keyboard.press('s')
+    pp = pi.value; pp.wait_for_timeout(1500)
+    pp.click('#dur'); pp.keyboard.type('10'); a0 = pg.evaluate('JSON.stringify(DeckWright.state())')
+    pp.keyboard.press('PageDown'); pp.wait_for_timeout(300)
+    check('clicker (PageDown) works while a text box has focus', pg.evaluate('JSON.stringify(DeckWright.state())') != a0)
+    ctx.close()
+    # a frame inside a slide cannot drive the presenter (here: clear all ink)
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(built('embed-post'))); pg.wait_for_timeout(500)
+    pg.keyboard.press('d'); pg.mouse.move(300, 300); pg.mouse.down(); pg.mouse.move(400, 350); pg.mouse.up(); pg.keyboard.press('Escape')
+    with ctx.expect_page() as pi: pg.keyboard.press('s')
+    pp = pi.value; pp.wait_for_timeout(2200)
+    check('postMessage from an embedded frame is ignored', len(pg.evaluate('DeckWright.ink()')) == 1)
     ctx.close()
 
     browser.close()
@@ -201,6 +274,69 @@ try:
     check('PPTX has 7 slides + notes', len(p.slides) == 7 and 'title slide' in p.slides[0].notes_slide.notes_text_frame.text)
 except ImportError:
     pass
+
+print('Review regressions (CLI)')
+r = cli('build', 'test/fixtures/unsafe-deck/deck', '-o', os.path.join(TMP, 'unsafe.html'))
+h = open(os.path.join(TMP, 'unsafe.html'), encoding='utf-8').read()
+import base64
+check('build never reads files outside the deck folder', 'TOPSECRET' not in h and base64.b64encode(b'TOPSECRET-DO-NOT-SHIP').decode() not in h and 'Outside the deck folder' in r.stdout, r.stdout)
+import re as _re
+m = _re.search(r'id="hdek-manifest">(.*?)</script>', h, _re.S)
+check('"$" in the title keeps the manifest valid', m and json.loads(m.group(1))['title'] == "Revenue ($'000)")
+check('srcset keeps an existing data: URL intact', 'srcset="data:image/png;base64,iVBORw0KGgo= 1x, data:image/png;base64,' in h)
+check('@import with layer() is kept as an @import', '") layer(base);' in h)
+check('defer script keeps defer', '<script defer src="data:text/javascript;base64,' in h)
+with sync_playwright() as pw:
+    b = pw.chromium.launch(); pg = b.new_page(); errs = []
+    pg.on('pageerror', lambda e: errs.append(str(e)))
+    pg.goto(url(os.path.join(TMP, 'unsafe.html'))); pg.wait_for_timeout(500)
+    check('built deck runs (deferred script after parsing)', not errs and pg.inner_text('h1') == 'deferred ok', (errs, pg.inner_text('h1')))
+    b.close()
+r = cli('pack', 'test/fixtures/unsafe-deck/deck', '-o', os.path.join(TMP, 'unsafe.hdek'))
+names = zipfile.ZipFile(os.path.join(TMP, 'unsafe.hdek')).namelist()
+check('pack: no ../ entries, @imported CSS assets included', not any('..' in n for n in names) and 'css/b.css' in names and 'photo (1).png' in names, names)
+r = cli('build', 'test/fixtures/euckr-deck', '-o', os.path.join(TMP, 'euckr.html'))
+check('EUC-KR deck converted to UTF-8', '<title>한글 발표</title>' in open(os.path.join(TMP, 'euckr.html'), encoding='utf-8').read() and 'euc-kr' in r.stdout, r.stdout)
+# ZIP safety
+zp = os.path.join(TMP, 'names.zip')
+with zipfile.ZipFile(zp, 'w') as zf:
+    zf.writestr('index.html', '<img src="이미지.png">'); zf.writestr('__proto__', 'x')
+node = """
+const C=require(process.argv[1]);const fs=require('fs'),z=require('zlib');
+(async()=>{const out={};
+ const f=await C.readZip(new Uint8Array(fs.readFileSync(process.argv[2])),(b,m)=>new Uint8Array(z.inflateRawSync(b,{maxOutputLength:Math.max(1,m)})));
+ out.proto=Object.getPrototypeOf(f)===null&&Object.keys(f).includes('__proto__');
+ try{await C.readZip(new Uint8Array(fs.readFileSync(process.argv[3])),(b,m)=>new Uint8Array(z.inflateRawSync(b,{maxOutputLength:Math.max(1,m)})),{entry:1e6,total:1e6,files:100});out.bomb='read'}catch(e){out.bomb=e.message}
+ try{C.writeZip(Array.from({length:65537},(_, i)=>({name:'f'+i,bytes:new Uint8Array(1)})));out.many='ok'}catch(e){out.many=e.message}
+ console.log(JSON.stringify(out));})();
+"""
+bomb = os.path.join(TMP, 'bomb.zip')
+with zipfile.ZipFile(bomb, 'w', zipfile.ZIP_DEFLATED) as zb: zb.writestr('index.html', 'x'); zb.writestr('big.bin', b'\0' * (8 * 1024 * 1024))
+o = subprocess.run(['node', '-e', node, os.path.join(ROOT, 'skills/deckwright/core/deckwright-core.js'), zp, bomb], capture_output=True, text=True)
+res = json.loads(o.stdout or '{}')
+check('ZIP: "__proto__" entry cannot change the file map', res.get('proto') is True, o.stdout + o.stderr)
+check('ZIP: size limits stop a ZIP bomb', 'expands' in str(res.get('bomb')), res)
+check('ZIP: more than 65,535 files is refused, not corrupted', 'Too many' in str(res.get('many')), res)
+# an entry name written in CP949 without the UTF-8 flag (Korean Windows zip tools)
+cpz = os.path.join(TMP, 'cp949name.zip')
+with zipfile.ZipFile(cpz, 'w') as zc:
+    zc.writestr('index.html', '<img src="이미지.png">'); zc.writestr('abcdef.png', b'PNG')
+raw = open(cpz, 'rb').read().replace(b'abcdef.png', '이미지.png'.encode('cp949')); open(cpz, 'wb').write(raw)
+r = cli('build', cpz, '-o', os.path.join(TMP, 'cp949.html'))
+check('ZIP: CP949 file names are read correctly', r.returncode == 0 and 'Missing' not in r.stdout and 'data:image/png;base64,UE5H' in open(os.path.join(TMP, 'cp949.html'), encoding='utf-8').read(), r.stdout + r.stderr)
+r = cli('biuld', 'x'); check('unknown command exits 1', r.returncode == 1)
+import time as _t
+t0 = _t.time(); r = subprocess.run(['node', os.path.join(ROOT, 'skills', 'deckwright', 'scripts', 'deckwright.mjs'), 'export', 'dist/demo.html', '--pdf'], cwd=ROOT, capture_output=True, text=True, timeout=60)
+check('export with a missing value fails fast (no hang)', r.returncode == 1 and _t.time() - t0 < 20, r.stderr)
+# inject (the default path in SKILL.md)
+src = os.path.join(TMP, 'inj'); os.makedirs(src, exist_ok=True)
+open(os.path.join(src, 'talk.html'), 'w').write(open(os.path.join(ROOT, 'examples/ai-style/index.html')).read())
+orig = open(os.path.join(src, 'talk.html')).read()
+r = cli('inject', os.path.join(src, 'talk.html'))
+outp = os.path.join(src, 'talk_DeckWright.html')
+check('inject writes <name>_DeckWright.html and leaves the original alone', os.path.exists(outp) and 'data-hdek-runtime' in open(outp).read() and open(os.path.join(src, 'talk.html')).read() == orig, r.stdout + r.stderr)
+check('unpack keeps the Korean file name', os.path.exists(os.path.join(TMP, 'u', 'img', '한글 그림.png')))
+check('export wrote a 7-page PDF', os.path.exists(os.path.join(TMP, 'd.pdf')) and __import__('pdfplumber').open(os.path.join(TMP, 'd.pdf')).pages.__len__() == 7)
 
 ok = sum(1 for r in results if r[1]); total = len(results)
 print(f'\n{ok}/{total} passed')

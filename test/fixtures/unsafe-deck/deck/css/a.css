@@ -1,0 +1,4 @@
+@import "b.css" layer(base);
+/* .old { background: url(old.png) } */
+.x{background:url("../photo (1).png")}
+.z{background:url(../../outside/secret.txt)}

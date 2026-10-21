@@ -1,0 +1,30 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>자체 엔진 덱</title>
+<style>
+html,body{height:100%;margin:0;background:#222;overflow:hidden;font-family:"Noto Sans KR",sans-serif}
+.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:center;background:#f6f5f1}
+.scene{position:absolute;inset:0;padding:100px;opacity:0;visibility:hidden;transition:opacity .4s}
+.scene.active{opacity:1;visibility:visible}
+[data-s]{opacity:0;transform:translateY(20px);transition:all .4s}
+[data-s].on{opacity:1;transform:none}
+h1{font-size:96px;margin:0 0 40px} p{font-size:48px}
+.note{display:none}
+.count{position:fixed;right:10px;bottom:10px;color:#fff}
+</style></head><body>
+<div class="stage" id="stage">
+<section class="scene"><h1>첫 장면</h1><p data-s="1">하나</p><p data-s="2">둘</p><aside class="note">첫 장면 노트</aside></section>
+<section class="scene"><h1>두 번째</h1><p data-s="1">셋</p><aside class="note">두 번째 노트</aside></section>
+<section class="scene"><h1>세 번째</h1><aside class="note">세 번째 노트</aside></section>
+<section class="scene"><h1>끝</h1><p data-s="1">넷</p><p data-s="2">다섯</p><p data-s="3">여섯</p><aside class="note">끝 노트</aside></section>
+</div><div class="count" id="count"></div>
+<script>
+(function(){var stage=document.getElementById('stage'),sc=[].slice.call(stage.querySelectorAll('.scene')),si=0,st=0;
+function fit(){var s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform='translate(-50%,-50%) scale('+s+')';}addEventListener('resize',fit);fit();
+function max(s){var m=0;[].forEach.call(s.querySelectorAll('[data-s]'),function(e){m=Math.max(m,+e.getAttribute('data-s'))});return m;}
+function render(){sc.forEach(function(s,i){s.classList.toggle('active',i===si)});[].forEach.call(sc[si].querySelectorAll('[data-s]'),function(e){e.classList.toggle('on',+e.getAttribute('data-s')<=st)});document.getElementById('count').textContent=(si+1)+'/'+sc.length;}
+function go(i,end){if(i<0||i>=sc.length)return;si=i;st=end?max(sc[si]):0;render();}
+function next(){if(st<max(sc[si])){st++;render()}else go(si+1)}
+function prev(){if(st>0){st--;render()}else go(si-1,true)}
+addEventListener('keyup',function(e){var k=e.key;if(k==='ArrowRight'||k===' '||k==='PageDown'){e.preventDefault();next()}else if(k==='ArrowLeft'||k==='PageUp'){e.preventDefault();prev()}else if(k==='Home')go(0)});
+document.getElementById('stage').addEventListener('click',function(){next()});
+window.__show=function(n){go(n-1,true)};go(0);})();
+</script></body></html>

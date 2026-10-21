@@ -1,4 +1,4 @@
-/*! DeckWright runtime v0.1.2 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright runtime v0.2.0 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -7,7 +7,7 @@
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
   var PRODUCT = 'DeckWright';
-  var VERSION = '0.1.2';
+  var VERSION = '0.2.0';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 
@@ -84,8 +84,16 @@
     '.hdek-ink.hdek-fixed{position:fixed}',
     '.hdek-ink.hdek-active{pointer-events:auto;cursor:crosshair}',
     '.hdek-blank{position:fixed;inset:0;z-index:2147483200;display:none}',
-    '.hdek-blank.on{display:block}',
-    '.hdek-ui{position:fixed;z-index:2147483300;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;color:#fff}',
+    '.hdek-blank.hdek-blank-on{display:block}',
+    '.hdek-ui-host{position:fixed;inset:0;z-index:2147483300;pointer-events:none}',
+    '@media print{.hdek-ui,.hdek-ui-host,.hdek-blank{display:none!important}}'
+  ].join('\n');
+
+  // Toolbar, toast, help and go-to box live in a shadow root, so a deck's CSS (td, kbd, .card, .on …) cannot reach them
+  var UI_CSS = [
+    ':host{all:initial}',
+    '.hdek-ui{position:fixed;z-index:1;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;color:#fff;box-sizing:border-box}',
+    '.hdek-ui *{box-sizing:border-box}',
     '.hdek-bar{left:16px;bottom:16px;display:flex;gap:4px;align-items:center;padding:6px;border-radius:12px;background:rgba(20,20,24,.82);backdrop-filter:blur(8px);box-shadow:0 6px 24px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:opacity .25s, transform .25s;pointer-events:none}',
     '.hdek-bar.show{opacity:1;transform:none;pointer-events:auto}',
     '.hdek-bar button{all:unset;box-sizing:border-box;width:34px;height:34px;border-radius:8px;display:grid;place-items:center;cursor:pointer;color:#e8e8ea}',
@@ -99,14 +107,14 @@
     '.hdek-toast{left:50%;bottom:28px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;background:rgba(20,20,24,.92);max-width:80vw;opacity:0;transition:opacity .25s;pointer-events:none}',
     '.hdek-toast.show{opacity:1}',
     '.hdek-goto{right:24px;bottom:24px;padding:8px 14px;border-radius:10px;background:rgba(20,20,24,.92);font-size:20px;display:none}',
-    '.hdek-help{inset:0;background:rgba(0,0,0,.72);display:none;place-items:center}',
+    '.hdek-help{inset:0;background:rgba(0,0,0,.72);display:none;place-items:center;pointer-events:auto}',
     '.hdek-help.on{display:grid}',
     '.hdek-help .hdek-card{background:#18181c;border-radius:16px;padding:24px 28px;min-width:420px;max-width:86vw;box-shadow:0 20px 60px rgba(0,0,0,.5)}',
     '.hdek-help h3{margin:0 0 12px;font-size:17px}',
     '.hdek-help table{border-collapse:collapse;font-size:14px}',
     '.hdek-help td{padding:4px 18px 4px 0;vertical-align:top}',
-    '.hdek-help kbd{display:inline-block;padding:1px 7px;margin:1px 2px;border-radius:5px;background:#2c2c32;border:1px solid #3a3a42;font:12px ui-monospace,Menlo,Consolas,monospace}',
-    '@media print{.hdek-ui,.hdek-blank{display:none!important}}'
+    '.hdek-help kbd{display:inline-block;padding:1px 7px;margin:1px 2px;border-radius:5px;background:#2c2c32;border:1px solid #3a3a42;font:12px ui-monospace,Menlo,Consolas,monospace;color:#fff}',
+    '.hdek-help td{color:#fff}'
   ].join('\n');
 
   function injectCSS(doc, css, id) {
@@ -180,11 +188,10 @@
       if (i === 0) { w = sw; h = sh; }
       else if (Math.abs(sw - w) > 1 || Math.abs(sh - h) > 1) return null;
     }
-    if (Math.abs(w - window.innerWidth) <= 2 && Math.abs(h - window.innerHeight) <= 2) {
-      // If it equals the viewport, check the authored CSS to tell fixed sizes from vw/vh/% responsive slides
-      var a = authoredSize(els[0]);
-      if (!a.w || /vw|vh|%|vmin|vmax|calc|auto/.test(a.w + a.h)) return null;
-    }
+    // Slides sized in vw/vh/% follow the window; scaling them as fixed boxes would scale them twice
+    var a = authoredSize(els[0]);
+    if (/vw|vh|%|vmin|vmax|calc|dvh|svh|lvh/.test(a.w + a.h)) return null;
+    if (Math.abs(w - window.innerWidth) <= 2 && Math.abs(h - window.innerHeight) <= 2 && (!a.w || /auto/.test(a.w + a.h))) return null;
     var ratio = w / h;
     if (ratio < 1 || ratio > 2.5) return null;
     return { w: Math.round(w), h: Math.round(h) };
@@ -242,7 +249,7 @@
       var host = D.slides[0].el.parentElement || document.body;
       try {
         this.observer = new MutationObserver(function () {
-          if (self.syncing) return;
+          if (self.syncing || self.paused) return;
           self.syncing = true;
           requestAnimationFrame(function () { self.syncing = false; self.sync(); });
         });
@@ -271,6 +278,7 @@
       return { slide: idx, step: step };
     },
     sync: function () {
+      if (this.paused) return;
       var s = this.read();
       D.slides.forEach(function (x, i) { x.el.classList.toggle('hdek-current', i === s.slide); });
       if (s.slide !== D.state.slide || s.step !== D.state.step) { D.state = s; afterChange(true); }
@@ -294,7 +302,7 @@
     next: function () { this.key('ArrowRight'); this.sync(); },
     prev: function () { this.key('ArrowLeft'); this.sync(); },
     apply: function (prev, target, animate) {
-      var cur = this.read(), self = this, guard = 0, c, n;
+      var cur = this.read(), guard = 0, c;
       var mx = this.max(cur.slide);
       if (cur.slide === target.slide && target.step === cur.step) { /* already there */ }
       else if (animate && cur.slide === target.slide && target.step === cur.step + 1) this.key('ArrowRight');
@@ -309,18 +317,52 @@
           while (c.slide === target.slide && c.step > target.step && guard++ < 200) { this.key('ArrowLeft'); c = this.read(); }
           done = c.slide === target.slide && c.step === target.step;
         }
-        if (!done) {
-          this.key('Home'); c = this.read(); guard = 0;
-          while ((c.slide > 0 || c.step > 0) && guard++ < 3000) { this.key('ArrowLeft'); n = this.read(); if (n.slide === c.slide && n.step === c.step) break; c = n; }
-          guard = 0;
-          while ((c.slide < target.slide || (c.slide === target.slide && c.step < target.step)) && guard++ < 3000) {
-            this.key('ArrowRight'); n = this.read(); if (n.slide === c.slide && n.step === c.step) break; c = n;
-          }
-        }
+        if (!done) { this.jump(target, animate); return; }
       }
       var now = this.read();
       if (!animate && D.slides[now.slide]) finishAnimations(D.slides[now.slide].el);
       D.state = now;
+    },
+    // Walk to the target one key at a time. Many decks ignore keys while a transition runs,
+    // so when a key changes nothing we wait for the deck before trying again instead of giving up.
+    token: 0,
+    jump: function (target, animate) {
+      var self = this, token = ++this.token, misses = 0, usedHome = false, t0 = Date.now();
+      function cmp(a) { return (a.slide - target.slide) || (a.step - target.step); }
+      function finish() {
+        if (token !== self.token) return;
+        var now = self.read();
+        if (!animate && D.slides[now.slide]) finishAnimations(D.slides[now.slide].el);
+        if (now.slide !== D.state.slide || now.step !== D.state.step) { D.state = now; afterChange(true); }
+      }
+      function walk() {
+        if (token !== self.token) return;
+        for (var guard = 0; guard < 400; guard++) {
+          var c = self.read(), d = cmp(c);
+          if (d === 0 || Date.now() - t0 > 20000) { finish(); return; }
+          // far behind the start: one Home is cheaper than many ←
+          var k = d < 0 ? 'ArrowRight' : (!usedHome && target.slide < c.slide / 2 ? 'Home' : 'ArrowLeft');
+          if (k === 'Home') usedHome = true;
+          self.key(k);
+          var n = self.read();
+          if (n.slide === c.slide && n.step === c.step) { waitFor(c); return; }
+          misses = 0;
+        }
+        setTimeout(walk, 0);
+      }
+      function waitFor(before) {
+        var started = Date.now();
+        (function poll() {
+          if (token !== self.token) return;
+          var n = self.read();
+          if (n.slide !== before.slide || n.step !== before.step) { misses = 0; setTimeout(walk, 30); return; }
+          if (Date.now() - started < 700) { setTimeout(poll, 25); return; }
+          if (++misses >= 3) { finish(); return; } // the deck will not move further
+          walk();
+        })();
+      }
+      D.state = this.read();
+      walk();
     }
   };
 
@@ -487,15 +529,32 @@
     }
   };
 
+  var STEP_ON = ['is-on', 'visible', 'on', 'show', 'shown'];
   function setSteps(s, step, animate) {
+    var check = [];
     s.steps.forEach(function (it) {
       var on = step >= it.at;
       var out = it.out && step >= it.out;
-      it.el.classList.toggle('is-on', on && !out);
-      it.el.classList.toggle('visible', on && !out);
+      (D.mode === 'heuristic' ? STEP_ON : STEP_ON.slice(0, 2)).forEach(function (c) { it.el.classList.toggle(c, on && !out); });
       it.el.classList.toggle('hdek-step-out', !!out);
       it.el.classList.toggle('current-step', on && !out && it.at === step);
+      if (D.mode === 'heuristic') {
+        if (on && !out) check.push(it.el);
+        else if (it.el.hasAttribute('data-hdek-forced')) { it.el.removeAttribute('data-hdek-forced'); it.el.style.removeProperty('opacity'); it.el.style.removeProperty('visibility'); }
+      }
     });
+    // In auto-detect mode the deck's own CSS decides what "shown" looks like. If a revealed step is still
+    // invisible once its transition has had time to run, show it anyway rather than click through a blank step.
+    if (check.length) setTimeout(function () {
+      check.forEach(function (el) {
+        if (!el.classList.contains('is-on')) return;
+        var cs = getComputedStyle(el);
+        if (parseFloat(cs.opacity) < 0.05 || cs.visibility === 'hidden') {
+          el.setAttribute('data-hdek-forced', '');
+          el.style.setProperty('opacity', '1', 'important'); el.style.setProperty('visibility', 'visible', 'important');
+        }
+      });
+    }, animate ? 900 : 30);
     if (s.hook && typeof s.hook.setStep === 'function') {
       try { s.hook.setStep(step, { animate: animate, slide: s.el, max: s.max }); } catch (e) { console.warn('[hdek] hook error', e); }
     }
@@ -608,7 +667,15 @@
     try { window.dispatchEvent(new CustomEvent('hdek:change', { detail: { slide: D.state.slide, step: D.state.step } })); } catch (e) { }
   }
 
-  function deckKey() { return (D.title + '|' + D.slides.length + '|' + location.pathname).slice(0, 200); }
+  // Ink/position key: stays the same when slides are added; a fingerprint separates decks opened from the same page (player.html)
+  var keyCache = null;
+  function deckKey() {
+    if (keyCache) return keyCache;
+    var sig = D.slides.slice(0, 3).map(function (s) { return s.id + ':' + s.title; }).join('|'), h = 2166136261;
+    for (var i = 0; i < sig.length; i++) { h ^= sig.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return (keyCache = (D.title + '|' + location.pathname).slice(0, 180) + '|' + h.toString(36));
+  }
+  function legacyKey() { return (D.title + '|' + D.slides.length + '|' + location.pathname).slice(0, 200); }
 
   function parseHash() {
     var m = /^#(\d+)(?:\.(\d+))?$/.exec(location.hash || '');
@@ -648,6 +715,7 @@
     var r = inkBox();
     var st = inkCanvas.style;
     st.left = r.left + 'px'; st.top = r.top + 'px'; st.width = r.width + 'px'; st.height = r.height + 'px';
+    Presenter.placeInk();
     renderInk();
   }
 
@@ -723,7 +791,7 @@
     document.body.appendChild(inkCanvas);
     inkAudience = new Ink(inkCanvas, function () { var r = inkBox(); return { w: r.width, h: r.height, scale: 1 }; });
     bindDraw(inkCanvas, window);
-    try { var saved = JSON.parse(store('hdek-ink:' + deckKey()) || 'null'); if (saved && typeof saved === 'object') D.ink = saved; } catch (e) { }
+    try { var saved = JSON.parse(store('hdek-ink:' + deckKey()) || store('hdek-ink:' + legacyKey()) || 'null'); if (saved && typeof saved === 'object') D.ink = saved; } catch (e) { }
   }
 
   function resizeInk() { positionInk(); }
@@ -742,7 +810,9 @@
     });
   }
 
-  function saveInk() { store('hdek-ink:' + deckKey(), JSON.stringify(D.ink)); }
+  var inkSaveTimer = null;
+  function flushInk() { if (inkSaveTimer) { clearTimeout(inkSaveTimer); inkSaveTimer = null; store('hdek-ink:' + deckKey(), JSON.stringify(D.ink)); } }
+  function saveInk() { if (!inkSaveTimer) inkSaveTimer = setTimeout(flushInk, 250); else { clearTimeout(inkSaveTimer); inkSaveTimer = setTimeout(flushInk, 250); } }
 
   function bindDraw(canvas, win) {
     var down = false, tempPen = false;
@@ -751,8 +821,7 @@
       var pr = e.pointerType === 'pen' ? (e.pressure || 0.5) : 0.5;
       return [clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1), pr];
     }
-    canvas.addEventListener('pointerdown', function (e) {
-      if (!D.tool) return;
+    function begin(e) {
       e.preventDefault();
       down = true;
       try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
@@ -761,7 +830,8 @@
       if (D.tool === 'laser') { moveLaser(pt(e)); return; }
       drawing = { t: D.tool, c: D.tool === 'hl' ? (D.color === '#111111' ? '#ffd60a' : D.color) : D.color, w: D.tool === 'hl' ? 0.026 : 0.0042, p: [pt(e)] };
       renderInk();
-    });
+    }
+    canvas.addEventListener('pointerdown', function (e) { if (D.tool && !down) begin(e); });
     canvas.addEventListener('pointermove', function (e) {
       if (D.tool === 'laser') { moveLaser(pt(e)); return; }
       if (!down) return;
@@ -777,10 +847,12 @@
       down = false;
       if (drawing) {
         var s = D.slides[D.state.slide];
+        drawing.p = drawing.p.map(function (q) { return [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4, Math.round((q[2] || 0.5) * 100) / 100]; });
         if (s && drawing.p.length) { (D.ink[s.id] = D.ink[s.id] || []).push(drawing); saveInk(); }
         drawing = null;
         renderInk();
       }
+      inkClickBlock = Date.now() + 400; // the click that follows a stroke must not advance the slide
       if (tempPen) { tempPen = false; setTool(null); }
     }
     canvas.addEventListener('pointerup', end);
@@ -789,10 +861,13 @@
     // A stylus writes without picking a tool (as in Slidev)
     var target = canvas.ownerDocument;
     target.addEventListener('pointerdown', function (e) {
-      if (e.pointerType === 'pen' && !D.tool && ROLE === 'audience') {
+      if (e.pointerType === 'pen' && !D.tool && ROLE === 'audience' && !down) {
         var r = canvas.getBoundingClientRect();
         if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+          // the canvas was not hit-testable yet, so start the stroke here and keep the event from the deck
           tempPen = true; setTool('pen');
+          e.stopImmediatePropagation();
+          begin(e);
         }
       }
     }, true);
@@ -817,7 +892,7 @@
   function clearInk(all) {
     if (all) D.ink = {};
     else { var s = D.slides[D.state.slide]; if (s) delete D.ink[s.id]; }
-    saveInk(); renderInk();
+    saveInk(); flushInk(); renderInk();
     toast(all ? T('모든 필기를 지웠습니다', 'Cleared all ink') : T('이 슬라이드의 필기를 지웠습니다', 'Cleared ink on this slide'));
   }
 
@@ -825,7 +900,7 @@
     D.tool = (D.tool === t) ? null : t;
     if (t === null) D.tool = null;
     if (D.tool !== 'laser') { laser = null; laserTrail = []; }
-    if (inkCanvas) inkCanvas.classList.toggle('hdek-active', !!D.tool);
+    if (inkCanvas) { inkCanvas.classList.toggle('hdek-active', !!D.tool); if (D.tool) positionInk(); }
     Presenter.toolChanged();
     updateBar();
     renderInk();
@@ -836,7 +911,7 @@
   function setBlank(kind) {
     D.blank = (D.blank === kind) ? null : kind;
     if (!blankEl) return;
-    blankEl.className = 'hdek-blank' + (D.blank ? ' on' : '');
+    blankEl.className = 'hdek-blank' + (D.blank ? ' hdek-blank-on' : '');
     blankEl.style.background = D.blank === 'white' ? '#fff' : '#000';
     Presenter.update();
   }
@@ -845,6 +920,11 @@
   var bar = null, toastEl = null, gotoEl = null, helpEl = null, idleTimer = null;
   function setupUI() {
     blankEl = document.createElement('div'); blankEl.className = 'hdek-blank'; document.body.appendChild(blankEl);
+    var host = document.createElement('div'); host.className = 'hdek-ui hdek-ui-host';
+    document.body.appendChild(host);
+    var uiRoot = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+    var st = document.createElement('style'); st.textContent = UI_CSS; uiRoot.appendChild(st);
+    if (uiRoot === host) injectCSS(document, UI_CSS.replace(':host{all:initial}', ''), 'hdek-ui-css');
     bar = document.createElement('div'); bar.className = 'hdek-ui hdek-bar';
     var html = '' +
       btn('prev', T('이전 (←)', 'Previous (←)')) + '<span class="hdek-num"></span>' + btn('next', T('다음 (→)', 'Next (→)')) +
@@ -862,10 +942,10 @@
       if (b.dataset.color) { D.color = b.dataset.color; if (!D.tool || D.tool === 'laser' || D.tool === 'eraser') setTool('pen'); else updateBar(); Presenter.toolChanged(); return; }
       action(b.dataset.act);
     });
-    document.body.appendChild(bar);
-    toastEl = document.createElement('div'); toastEl.className = 'hdek-ui hdek-toast'; document.body.appendChild(toastEl);
-    gotoEl = document.createElement('div'); gotoEl.className = 'hdek-ui hdek-goto'; document.body.appendChild(gotoEl);
-    helpEl = document.createElement('div'); helpEl.className = 'hdek-ui hdek-help'; helpEl.innerHTML = helpHTML(); document.body.appendChild(helpEl);
+    uiRoot.appendChild(bar);
+    toastEl = document.createElement('div'); toastEl.className = 'hdek-ui hdek-toast'; uiRoot.appendChild(toastEl);
+    gotoEl = document.createElement('div'); gotoEl.className = 'hdek-ui hdek-goto'; uiRoot.appendChild(gotoEl);
+    helpEl = document.createElement('div'); helpEl.className = 'hdek-ui hdek-help'; helpEl.innerHTML = helpHTML(); uiRoot.appendChild(helpEl);
     helpEl.addEventListener('click', function () { helpEl.classList.remove('on'); });
     document.addEventListener('mousemove', function (e) {
       document.documentElement.classList.remove('hdek-idle');
@@ -982,24 +1062,32 @@
 
   var REVEAL_OWN = { next: 1, prev: 1, first: 1, last: 1 };
   var NAV = { next: 1, prev: 1, first: 1, last: 1 };
-  // Check shortly after whether the deck handled it; if not, move ourselves
-  function afterDeck(fn) {
-    var before = { slide: D.state.slide, step: D.state.step };
-    setTimeout(function () {
-      Driver.sync();
-      if (D.state.slide === before.slide && D.state.step === before.step) fn();
-    }, 40);
+  // Give the deck the first chance. Some decks move on keyup or after a short timer,
+  // so we act only if nothing changed by the time the key is released and ~300 ms have passed.
+  function afterDeck(fn, keyEv) {
+    var before = Driver.read(), t0 = Date.now(), released = !keyEv;
+    var onUp = function (e) { if (!keyEv || e.key === keyEv.key) { released = true; w.removeEventListener('keyup', onUp, true); } };
+    var w = (keyEv && keyEv.view) || window;
+    if (keyEv) { try { w.addEventListener('keyup', onUp, true); } catch (x) { released = true; } }
+    (function poll() {
+      var n = Driver.read();
+      if (n.slide !== before.slide || n.step !== before.step) { Driver.sync(); return; }
+      if (released && Date.now() - t0 >= 300) { fn(); return; }
+      if (Date.now() - t0 > 1500) released = true;
+      setTimeout(poll, 30);
+    })();
   }
   function handleKey(e) {
     if (e.__hdek) return;
-    if (isTyping(e.target)) return;
+    // clickers send PageUp/PageDown: they must work even while a text field has focus
+    if (isTyping(e.target) && e.key !== 'PageDown' && e.key !== 'PageUp') return;
     var k = e.key;
     if (/^[0-9]$/.test(k) && !e.ctrlKey && !e.metaKey && !e.altKey) {
       gotoBuf += k; showGoto(); e.preventDefault(); e.stopImmediatePropagation(); return;
     }
     if (k === 'Enter') {
       if (gotoBuf) { var n = parseInt(gotoBuf, 10); gotoBuf = ''; showGoto(); if (n > 0) go(n - 1, 0, false); e.preventDefault(); e.stopImmediatePropagation(); return; }
-      if (D.mode === 'driver') { afterDeck(next); return; }
+      if (D.mode === 'driver') { afterDeck(next, e); return; }
       if (D.mode !== 'reveal') { next(); e.preventDefault(); }
       return;
     }
@@ -1015,7 +1103,7 @@
     if (D.mode === 'reveal' && REVEAL_OWN[a] && ROLE === 'audience' && e.currentTarget === window) return; // reveal handles it
     if (D.mode === 'driver' && NAV[a] && e.currentTarget === window) {
       // Let the deck's engine go first; handle only keys it ignores (↓, ↑, …)
-      afterDeck(function () { action(a, e); });
+      afterDeck(function () { action(a, e); }, e);
       return;
     }
     e.preventDefault();
@@ -1042,19 +1130,23 @@
     return false;
   }
 
-  var wheelLock = 0, wheelAcc = 0;
+  var wheelLock = 0, wheelAcc = 0, inkClickBlock = 0;
   function bindInput() {
     window.addEventListener('keydown', handleKey, true);
-    document.addEventListener('click', function (e) {
+    // Capture phase: when we advance, the deck's own click handler must not advance as well.
+    // Driver decks are the exception: their engine goes first and we only fill in.
+    window.addEventListener('click', function (e) {
+      if (Date.now() < inkClickBlock) { e.stopImmediatePropagation(); e.preventDefault(); return; } // the click that ends a pen stroke
       if (!D.clickAdvance || D.tool || e.button !== 0) return;
-      if (D.mode === 'single') return;
+      if (D.mode === 'single' || D.mode === 'reveal') return;
       var s = D.slides[D.state.slide];
       if (isInteractive(e.target, s && s.el)) return;
       var sel = window.getSelection && window.getSelection();
       if (sel && String(sel).length > 0) return;
       if (D.mode === 'driver') { afterDeck(next); return; }
+      e.stopImmediatePropagation();
       next();
-    });
+    }, true);
     window.addEventListener('wheel', function (e) {
       if (!D.wheelAdvance || e.ctrlKey || D.mode === 'single') return;
       var el = e.target;
@@ -1064,31 +1156,39 @@
         el = el.parentElement;
       }
       e.preventDefault();
+      if (D.mode !== 'driver' && D.mode !== 'reveal') e.stopImmediatePropagation();
       var now = Date.now();
-      if (now < wheelLock) return;
+      // trackpad momentum keeps sending events: one swipe = one step, so wait for a quiet gap
+      if (now < wheelLock) { wheelLock = Math.max(wheelLock, now + 180); return; }
       wheelAcc += e.deltaY;
       if (Math.abs(wheelAcc) < 30) return;
       if (wheelAcc > 0) next(); else prev();
       wheelAcc = 0; wheelLock = now + 450;
-    }, { passive: false });
+    }, { passive: false, capture: true });
+    // Touch swipes: touch events still arrive when the browser takes the gesture for panning
     var sx = null, sy = null;
-    document.addEventListener('pointerdown', function (e) { if (e.pointerType === 'touch' && !D.tool) { sx = e.clientX; sy = e.clientY; } });
-    document.addEventListener('pointerup', function (e) {
-      if (sx === null || e.pointerType !== 'touch') return;
-      var dx = e.clientX - sx, dy = e.clientY - sy; sx = null;
+    document.addEventListener('touchstart', function (e) { if (!D.tool && e.touches.length === 1) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; } else sx = null; }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+      if (sx === null || !e.changedTouches.length) return;
+      var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy; sx = null;
       if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
         var f = dx < 0 ? next : prev;
         if (D.mode === 'driver') afterDeck(f); else f();
       }
+    }, { passive: true });
+    window.addEventListener('resize', function () { fit(); Presenter.layout(); });
+    // the slide may still be animating into place when it becomes current: re-fit the ink canvas when it settles
+    ['transitionend', 'animationend'].forEach(function (t) {
+      document.addEventListener(t, function (e) { var s = D.slides[D.state.slide]; if (s && e.target === s.el) positionInk(); }, true);
     });
-    window.addEventListener('resize', fit);
+    window.addEventListener('pagehide', flushInk);
     window.addEventListener('beforeunload', function () { Presenter.close(); });
     window.addEventListener('beforeprint', printPrepare);
     window.addEventListener('afterprint', printRestore);
   }
 
   // ------------------------------------------------------------------ print
-  var printStyle = null, printAdded = [];
+  var printStyle = null, printAdded = [], printSaved = null;
   function printPrepare() {
     var html = document.documentElement;
     html.classList.add('hdek-printing', 'hdek-snap');
@@ -1118,6 +1218,7 @@
       });
     }
     if (D.mode === 'driver') {
+      Driver.paused = true; printSaved = { slide: D.state.slide, step: D.state.step };
       D.slides.forEach(function (s) {
         addCls(s.el, Driver.activeClass);
         Driver.stepsOf(s.el).forEach(function (e) { addCls(e, 'on'); addCls(e, 'is-on'); addCls(e, 'visible'); });
@@ -1139,7 +1240,14 @@
     if (printStyle) { printStyle.remove(); printStyle = null; }
     printAdded.forEach(function (x) { x[0].classList.remove(x[1]); });
     printAdded = [];
-    if (D.mode === 'driver') { Driver.apply(D.state, D.state, false); Driver.sync(); fit(); requestAnimationFrame(function () { html.classList.remove('hdek-snap'); }); return; }
+    if (D.mode === 'driver') {
+      Driver.paused = false;
+      var back = printSaved || D.state; printSaved = null;
+      var now = Driver.read();
+      if (now.slide !== back.slide || now.step !== back.step) Driver.apply(now, back, false);
+      Driver.sync(); fit(); requestAnimationFrame(function () { html.classList.remove('hdek-snap'); });
+      return;
+    }
     fit();
     if (D.mode !== 'reveal') {
       D.slides.forEach(function (s, i) {
@@ -1201,7 +1309,7 @@
       els.curoff.style.display = showCurLive ? 'none' : 'grid';
       // ink on presenter
       var pc = doc.createElement('canvas'); pc.className = 'pink'; els.curbox.appendChild(pc);
-      inkP = new Ink(pc, function () { var r = els.curbox.getBoundingClientRect(); return { w: r.width || 1, h: r.height || 1, scale: 1 }; });
+      inkP = new Ink(pc, function () { var r = pc.getBoundingClientRect(); return { w: r.width || 1, h: r.height || 1, scale: 1 }; });
       els.pink = pc;
       bindDraw(pc, w);
       w.addEventListener('message', onMsg);
@@ -1211,7 +1319,8 @@
       doc.addEventListener('click', onClick);
       doc.getElementById('notesminus').addEventListener('click', function () { setNotes(-2); });
       doc.getElementById('notesplus').addEventListener('click', function () { setNotes(2); });
-      els.dur.addEventListener('change', function () { D.duration = parseFloat(els.dur.value) || 0; tickTimer(); });
+      els.dur.addEventListener('change', function () { D.duration = parseFloat(els.dur.value) || 0; tickTimer(); els.dur.blur(); });
+      els.dur.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === 'Escape') els.dur.blur(); });
       els.elapsed.addEventListener('click', toggleTimer);
       buildList();
       layout();
@@ -1243,7 +1352,11 @@
         ready[key] = true;
         if (queued[key]) { post(key, queued[key]); }
       }
-      if (d.type === 'key') handleKey({ key: d.key, shiftKey: d.shiftKey, target: null, preventDefault: function () { }, stopImmediatePropagation: function () { } });
+      if (d.type === 'key') {
+        var fromPreview = e.source && ((els.curframe && e.source === els.curframe.contentWindow) || (els.nxtframe && e.source === els.nxtframe.contentWindow));
+        if (!fromPreview || typeof d.key !== 'string') return; // anything embedded in a slide could post here
+        handleKey({ key: d.key, shiftKey: !!d.shiftKey, target: null, preventDefault: function () { }, stopImmediatePropagation: function () { } });
+      }
     }
 
     function post(key, msg) {
@@ -1264,8 +1377,23 @@
         if (!(s > 0)) return;
         box.style.width = (a.w * s) + 'px'; box.style.height = (a.h * s) + 'px';
         if (fr) { fr.style.width = a.w + 'px'; fr.style.height = a.h + 'px'; fr.style.transform = 'scale(' + s + ')'; }
+        if (t[0] === 'cur') placeInk(s);
       });
       renderInk();
+    }
+    // The audience stores ink relative to the slide rectangle; in an unstaged deck that rectangle is only part of
+    // the window, so the presenter canvas must cover the same part of the preview.
+    function placeInk(s) {
+      if (!els.pink) return;
+      var st = els.pink.style;
+      if (D.staged || D.mode === 'reveal') { st.left = '0'; st.top = '0'; st.width = '100%'; st.height = '100%'; return; }
+      var r = inkBox();
+      st.left = (r.left * s) + 'px'; st.top = (r.top * s) + 'px'; st.width = (r.width * s) + 'px'; st.height = (r.height * s) + 'px';
+    }
+    function placeInkNow() {
+      if (!w || w.closed || !els.cur) return;
+      var a = aspect(), r = els.curbox.getBoundingClientRect(), s = r.width / a.w;
+      if (s > 0) placeInk(s);
     }
 
     function update() {
@@ -1374,7 +1502,7 @@
 
     return {
       open: open, close: close, update: update, renderInk: renderInkP, toolChanged: toolChanged, showGoto: showGotoP,
-      isOpen: function () { return !!(w && !w.closed); }, layout: layout
+      isOpen: function () { return !!(w && !w.closed); }, layout: layout, placeInk: placeInkNow
     };
   })();
 
@@ -1402,7 +1530,7 @@
     '.box{position:relative;overflow:hidden;background:#000;border-radius:6px;box-shadow:0 0 0 1px #2a2a31}',
     '#curbox{box-shadow:0 0 0 2px #0a84ff55}',
     '.box iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;pointer-events:none;background:#000}',
-    '.pink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none}',
+    '.pink{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;touch-action:none}',
     '.pink.active{pointer-events:auto;cursor:crosshair}',
     '#curoff{position:absolute;inset:0;display:none;place-items:center;color:#777;font-size:14px;text-align:center;padding:20px}',
     '#side{display:grid;grid-template-rows:minmax(0,0.9fr) auto minmax(0,1.4fr);gap:8px;min-height:0}',
@@ -1478,7 +1606,11 @@
     window.addEventListener('message', function (e) {
       var d = e.data;
       if (!d || d.hdek !== 1) return;
-      if (d.type === 'goto') go(d.slide, d.step, d.animate);
+      // the presenter page is driven by the audience window's script, so messages come from the parent or its opener
+      var ok = e.source === window.parent;
+      try { ok = ok || (!!window.parent.opener && e.source === window.parent.opener); } catch (x) { }
+      if (!ok) return;
+      if (d.type === 'goto') go(+d.slide || 0, +d.step || 0, !!d.animate);
     });
     window.addEventListener('keydown', function (e) {
       if (e.__hdek || !e.isTrusted) return; // never echo our own synthetic keys back

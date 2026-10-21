@@ -1,4 +1,4 @@
-/*! DeckWright core v0.1.2 | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright core v0.2.0 | MIT License | https://github.com/grotyx/deckwright
  *  Shared by player.html (browser) and the CLI (Node):
  *  runtime injection, local asset inlining, .hdek (ZIP) read/write, manifest, static checks.
  */
@@ -10,6 +10,9 @@
   'use strict';
 
   var FORMAT = 'hdek/1';
+  // Limits for reading packages (a small ZIP can expand to gigabytes)
+  var LIMITS = { entry: 1024 * 1048576, total: 2048 * 1048576, files: 20000 };
+  function own(map, key) { return map && Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined; }
   var LANG = 'en';
   function setLang(l) { LANG = l === 'ko' ? 'ko' : 'en'; }
   function T(ko, en) { return LANG === 'ko' ? ko : en; }
@@ -38,9 +41,36 @@
   }
   function dataURL(bytes, mime) { return 'data:' + mime + ';base64,' + b64(bytes); }
 
+  /**
+   * decodeHTML(bytes) → { html, charset, converted }
+   * Honors a BOM or <meta charset> (e.g. EUC-KR decks) and rewrites the declaration to UTF-8,
+   * because every output DeckWright writes is UTF-8.
+   */
+  function decodeHTML(bytes) {
+    var cs = 'utf-8';
+    if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) cs = 'utf-8';
+    else if (bytes[0] === 0xFF && bytes[1] === 0xFE) cs = 'utf-16le';
+    else if (bytes[0] === 0xFE && bytes[1] === 0xFF) cs = 'utf-16be';
+    else {
+      var head = String.fromCharCode.apply(null, Array.prototype.slice.call(bytes.subarray(0, 2048)));
+      var m = /<meta\b[^>]*?charset\s*=\s*["']?\s*([\w.:-]+)/i.exec(head);
+      if (m) cs = m[1].toLowerCase();
+    }
+    var html;
+    try { html = new TextDecoder(cs).decode(bytes); } catch (e) { cs = 'utf-8'; html = utf8Decode(bytes); }
+    var converted = !/^(utf-?8|unicode-1-1-utf-8)$/.test(cs);
+    if (converted || /^utf-16/.test(cs)) {
+      html = html.replace(/<meta\b[^>]*?charset\s*=\s*["']?\s*[\w.:-]+["']?[^>]*>/gi, function (tag) {
+        return /http-equiv/i.test(tag) ? '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' : '<meta charset="utf-8">';
+      });
+    }
+    return { html: html.replace(/^\uFEFF/, ''), charset: cs, converted: converted };
+  }
+
   // ---------------------------------------------------------------- paths
   function isExternal(u) { return /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(u); }
-  function isSkippable(u) { return !u || /^(?:data:|blob:|#|about:|javascript:|mailto:|tel:)/i.test(u); }
+  function isSkippable(u) { return !u || /^(?:data:|blob:|#|%23|about:|javascript:|mailto:|tel:)/i.test(u); }
+  function isOutside(p) { return p === '..' || p.indexOf('../') === 0; }
   function dirname(p) { var i = p.lastIndexOf('/'); return i < 0 ? '' : p.slice(0, i + 1); }
   function normalize(p) {
     var out = [];
@@ -52,7 +82,7 @@
     return out.join('/');
   }
   function resolvePath(base, rel) {
-    var clean = rel.replace(/[?#].*$/, '');
+    var clean = rel.replace(/\\/g, '/').replace(/[?#].*$/, '');
     try { clean = decodeURIComponent(clean); } catch (e) { }
     if (clean.charAt(0) === '/') return normalize(clean);
     return normalize(dirname(base) + clean);
@@ -101,12 +131,13 @@
     var read = opts.read;
     var urlFor = opts.urlFor || function (bytes, mime) { return dataURL(bytes, mime); };
     var collect = opts.mode === 'collect';
-    var report = { external: [], missing: [], used: [] };
-    var cache = {};
+    var report = { external: [], missing: [], used: [], outside: [], warnings: [] };
+    var cache = Object.create(null);
 
     function note(list, v) { if (list.indexOf(v) < 0) list.push(v); }
 
     async function load(path) {
+      if (isOutside(path)) { note(report.outside, path); return null; }
       if (path in cache) return cache[path];
       var b = null;
       try { b = await read(path); } catch (e) { b = null; }
@@ -114,19 +145,21 @@
       if (b) note(report.used, path); else note(report.missing, path);
       return b;
     }
-    async function urlOf(ref, fromPath) {
+    async function urlOf(ref, fromPath, depth) {
       ref = unescAttr(ref.trim());
       if (isSkippable(ref)) return null;
       if (isExternal(ref)) { note(report.external, ref); return null; }
       var p = resolvePath(fromPath, ref);
+      if (!p) return null;
       var bytes = await load(p);
       if (!bytes) return null;
-      if (collect) return null;
       var hash = /#.*$/.exec(ref);
       if (/\.css$/i.test(p)) {
-        var css = await inlineCSS(utf8Decode(bytes), p);
-        return urlFor(utf8Encode(css), 'text/css', p);
+        if ((depth || 0) > 8) return null;
+        var css = await inlineCSS(utf8Decode(bytes), p, (depth || 0) + 1);
+        return collect ? null : urlFor(utf8Encode(css), 'text/css', p);
       }
+      if (collect) return null;
       return urlFor(bytes, mimeOf(p), p) + (hash && /\.svg$/i.test(p) ? hash[0] : '');
     }
     async function replaceAsync(str, re, fn) {
@@ -142,29 +175,45 @@
     }
     async function inlineCSS(css, fromPath, depth) {
       depth = depth || 0;
-      css = await replaceAsync(css, /@import\s+(?:url\(\s*)?(["']?)([^"')\s;]+)\1\s*\)?([^;]*);/gi, async function (all, q, ref, media) {
+      css = css.replace(/\/\*[\s\S]*?\*\//g, '');
+      css = await replaceAsync(css, /@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|"([^"]*)"|'([^']*)')([^;]*);/gi, async function (all, a1, a2, a3, a4, a5, rest) {
+        var ref = [a1, a2, a3, a4, a5].filter(function (x) { return x !== undefined; })[0] || '';
         if (isExternal(ref)) { note(report.external, ref); return all; }
         var p = resolvePath(fromPath, ref);
         var b = await load(p);
-        if (!b || collect || depth > 8) return all;
+        if (!b || depth > 8) return all;
         var inner = await inlineCSS(utf8Decode(b), p, depth + 1);
-        return media && media.trim() ? '@media ' + media.trim() + '{' + inner + '}' : inner;
+        if (collect) return all;
+        rest = (rest || '').trim();
+        // layer() and supports() cannot be expressed as @media: keep the @import, point it at the inlined sheet
+        if (/^(layer|supports)\b/i.test(rest)) return '@import url("' + urlFor(utf8Encode(inner), 'text/css', p) + '") ' + rest + ';';
+        return rest ? '@media ' + rest + '{' + inner + '}' : inner;
       });
-      css = await replaceAsync(css, /url\(\s*(["']?)([^"')]+)\1\s*\)/gi, async function (all, q, ref) {
-        var u = await urlOf(ref, fromPath);
+      css = await replaceAsync(css, /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)'"\s][^)]*?))\s*\)/gi, async function (all, d, sq, bare) {
+        var ref = d !== undefined ? d : sq !== undefined ? sq : bare;
+        var u = await urlOf(ref, fromPath, depth);
         return u ? 'url("' + u + '")' : all;
       });
       return css;
     }
     async function srcset(val, fromPath) {
-      var items = val.split(',');
-      var out = [];
-      for (var i = 0; i < items.length; i++) {
-        var bits = items[i].trim().split(/\s+/);
-        if (!bits[0]) continue;
-        var u = await urlOf(bits[0], fromPath);
-        if (u) bits[0] = u;
-        out.push(bits.join(' '));
+      var out = [], i = 0, n = val.length;
+      while (i < n) {
+        while (i < n && /[\s,]/.test(val[i])) i++;
+        if (i >= n) break;
+        var j = i;
+        while (j < n && !/\s/.test(val[j])) j++;
+        var url = val.slice(i, j), desc = '';
+        if (/,$/.test(url) && !/^data:/i.test(url)) { url = url.replace(/,+$/, ''); }
+        else {
+          var k = j;
+          while (k < n && val[k] !== ',') k++;
+          desc = val.slice(j, k).trim();
+          j = k + 1;
+        }
+        i = j;
+        var u = await urlOf(url, fromPath);
+        out.push((u || url) + (desc ? ' ' + desc : ''));
       }
       return out.join(', ');
     }
@@ -180,9 +229,16 @@
           var p = resolvePath(base, unescAttr(src));
           var b = await load(p);
           if (b && !collect) {
+            var stripped = open.replace(/\s(src|integrity|crossorigin)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+            var isModule = /^module$/i.test(getAttr(open, 'type') || '');
+            if (isModule && /\bimport\s*(?:[\w{*][^;]*?\bfrom\s*)?["']\.{0,2}\//.test(utf8Decode(b))) note(report.warnings, T('모듈 스크립트의 상대 경로 import는 단독 HTML에서 동작하지 않습니다: ', 'Relative imports in a module script do not work in a single HTML: ') + p);
+            if (isModule || hasAttr(open, 'defer') || hasAttr(open, 'async')) {
+              // an inline script ignores defer/async: keep a src (data or blob URL) so the timing stays the same
+              out.push(stripped.replace(/>$/, ' src="' + escAttr(urlFor(b, 'text/javascript', p)) + '">') + '</script>');
+              continue;
+            }
             var code = utf8Decode(b).replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
-            var tag = open.replace(/\s(src|integrity|crossorigin)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-            out.push(tag + code + '</script>');
+            out.push(stripped + code + '</script>');
             continue;
           }
         }
@@ -193,7 +249,7 @@
       } else if (part.t === 'comment') {
         out.push(s);
       } else {
-        s = await replaceAsync(s, /<([a-z][a-z0-9-]*)\b[^>]*>/gi, async function (tag, name) {
+        s = await replaceAsync(s, /<([a-z][a-z0-9-]*)\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, async function (tag, name) {
           name = name.toLowerCase();
           if (name === 'link') {
             var rel = (getAttr(tag, 'rel') || '').toLowerCase(), href = getAttr(tag, 'href');
@@ -202,13 +258,15 @@
             if (/stylesheet/.test(rel)) {
               var p2 = resolvePath(base, unescAttr(href));
               var b2 = await load(p2);
-              if (!b2 || collect) return tag;
+              if (!b2) return tag;
+              var sheet = await inlineCSS(utf8Decode(b2), p2);
+              if (collect) return tag;
               var media = getAttr(tag, 'media');
-              return '<style' + (media ? ' media="' + escAttr(media) + '"' : '') + ' data-hdek-from="' + escAttr(p2) + '">' + (await inlineCSS(utf8Decode(b2), p2)) + '</style>';
+              return '<style' + (media ? ' media="' + escAttr(media) + '"' : '') + ' data-hdek-from="' + escAttr(p2) + '">' + sheet + '</style>';
             }
             if (/icon|preload/.test(rel)) {
               var u0 = await urlOf(href, base);
-              return u0 ? tag.replace(/(\shref\s*=\s*)("[^"]*"|'[^']*'|[^\s>]+)/i, '$1"' + escAttr(u0) + '"') : tag;
+              return u0 ? tag.replace(/(\shref\s*=\s*)("[^"]*"|'[^']*'|[^\s>]+)/i, function (all, pre) { return pre + '"' + escAttr(u0) + '"'; }) : tag;
             }
             return tag;
           }
@@ -216,18 +274,25 @@
           if (name === 'image' || name === 'feimage') attrs.push('href', 'xlink:href');
           if (name === 'object') attrs.push('data');
           if (name === 'iframe') attrs = []; // leave nested HTML alone
+          if (name === 'use') {
+            var uh = getAttr(tag, 'href') || getAttr(tag, 'xlink:href');
+            if (uh && !isSkippable(uh) && !isExternal(uh)) {
+              var up = resolvePath(base, unescAttr(uh));
+              if (up && (await load(up)) && !collect) note(report.warnings, T('SVG <use> 스프라이트는 단독 HTML에 넣을 수 없어 원래 파일을 참조합니다: ', 'SVG <use> sprites cannot be inlined; the file stays external: ') + up);
+            }
+          }
           for (var a = 0; a < attrs.length; a++) {
             var v = getAttr(tag, attrs[a]);
             if (v === null) continue;
             // skip data-* values that are colors or plain values (e.g. data-bg="231F20"), not paths
             if (/^data-|^background$/.test(attrs[a]) && !/[./]/.test(v)) continue;
             var u = await urlOf(v, base);
-            if (u) tag = tag.replace(new RegExp('(\\s' + attrs[a].replace(':', '\\:') + '\\s*=\\s*)("[^"]*"|\'[^\']*\'|[^\\s>]+)', 'i'), '$1"' + escAttr(u) + '"');
+            if (u) tag = tag.replace(new RegExp('(\\s' + attrs[a].replace(':', '\\:') + '\\s*=\\s*)("[^"]*"|\'[^\']*\'|[^\\s>]+)', 'i'), function (all, pre) { return pre + '"' + escAttr(u) + '"'; });
           }
           var ss = getAttr(tag, 'srcset');
           if (ss) {
             var nv = await srcset(unescAttr(ss), base);
-            tag = tag.replace(/(\ssrcset\s*=\s*)("[^"]*"|'[^']*'|[^\s>]+)/i, '$1"' + escAttr(nv) + '"');
+            tag = tag.replace(/(\ssrcset\s*=\s*)("[^"]*"|'[^']*'|[^\s>]+)/i, function (all, pre) { return pre + '"' + escAttr(nv) + '"'; });
           }
           var st = getAttr(tag, 'style');
           if (st && /url\(/i.test(st)) {
@@ -252,7 +317,7 @@
     // remove any existing runtime (external reference or older version) and insert the current one
     html = html.replace(/<script\b[^>]*\bdata-hdek-runtime\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
     if (extraHead) {
-      if (/<\/head>/i.test(html)) html = html.replace(/<\/head>/i, extraHead + '\n</head>');
+      if (/<\/head>/i.test(html)) html = html.replace(/<\/head>/i, function () { return extraHead + '\n</head>'; });
       else html = extraHead + html;
     }
     var idx = html.search(/<\/body\s*>(?![\s\S]*<\/body\s*>)/i);
@@ -329,10 +394,15 @@
   }
 
   /** writeZip(entries[{name, bytes}], deflateRaw?) → Uint8Array (stored uncompressed without deflateRaw) */
-  function writeZip(entries, deflateRaw) {
+  function writeZip(entries, deflateRaw, opts) {
+    if (entries.length > 0xFFFF) throw new Error(T('파일이 너무 많습니다(65535개 초과). 폴더를 정리하세요.', 'Too many files for a package (over 65,535).'));
     var locals = [], centrals = [], offset = 0;
-    var dt = new Date(), dosTime = ((dt.getHours() << 11) | (dt.getMinutes() << 5) | (dt.getSeconds() >> 1)) & 0xFFFF;
-    var dosDate = (((dt.getFullYear() - 1980) << 9) | ((dt.getMonth() + 1) << 5) | dt.getDate()) & 0xFFFF;
+    // a fixed date (reproducible builds) is written in UTC so every machine produces the same bytes
+    var fixed = opts && opts.date, dt = fixed || new Date();
+    var H = fixed ? dt.getUTCHours() : dt.getHours(), Mi = fixed ? dt.getUTCMinutes() : dt.getMinutes(), S = fixed ? dt.getUTCSeconds() : dt.getSeconds();
+    var Y = fixed ? dt.getUTCFullYear() : dt.getFullYear(), Mo = fixed ? dt.getUTCMonth() : dt.getMonth(), D = fixed ? dt.getUTCDate() : dt.getDate();
+    var dosTime = ((H << 11) | (Mi << 5) | (S >> 1)) & 0xFFFF;
+    var dosDate = (((Y - 1980) << 9) | ((Mo + 1) << 5) | D) & 0xFFFF;
     entries.forEach(function (e) {
       var name = utf8Encode(e.name), data = e.bytes, method = 0, comp = data;
       var already = /\.(png|jpe?g|gif|webp|avif|mp4|m4v|webm|mov|mp3|m4a|woff2?|zip|gz)$/i.test(e.name);
@@ -355,6 +425,7 @@
       ch.setUint32(42, offset, true);
       centrals.push(new Uint8Array(ch.buffer), name);
       offset += 30 + name.length + comp.length;
+      if (offset > 0xFFFFFFFF || data.length > 0xFFFFFFFF) throw new Error(T('패키지가 4GB를 넘습니다. 영상을 줄이거나 나누세요.', 'The package would exceed 4 GB (ZIP64 is not supported).'));
     });
     var cdSize = centrals.reduce(function (a, b) { return a + b.length; }, 0);
     var end = new DataView(new ArrayBuffer(22));
@@ -366,52 +437,89 @@
     return out;
   }
 
-  /** readZip(bytes, inflateRaw?) → Promise<Object name→Uint8Array>  (browsers use DecompressionStream) */
-  async function readZip(bytes, inflateRaw) {
+  function decodeName(nameBytes, flags, extra) {
+    // Info-ZIP Unicode Path extra field (0x7075) wins when present
+    for (var i = 0; i + 4 <= extra.length;) {
+      var id = extra[i] | (extra[i + 1] << 8), len = extra[i + 2] | (extra[i + 3] << 8);
+      if (id === 0x7075 && len > 5) return utf8Decode(extra.subarray(i + 9, i + 4 + len));
+      i += 4 + len;
+    }
+    // UTF-8 when the bytes are valid UTF-8 (some tools set the flag on CP949 names, others omit it on UTF-8 names)
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(nameBytes); } catch (e) { }
+    try { return new TextDecoder('euc-kr').decode(nameBytes); } catch (e) { } // Korean Windows zip tools (CP949)
+    return Array.prototype.map.call(nameBytes, function (c) { return String.fromCharCode(c); }).join('');
+  }
+
+  /** readZip(bytes, inflateRaw?, limits?) → Promise<Object name→Uint8Array>  (browsers use DecompressionStream) */
+  async function readZip(bytes, inflateRaw, limits) {
+    try { return await readZipInner(bytes, inflateRaw, limits || LIMITS); } catch (e) {
+      if (e instanceof RangeError) throw new Error(T('패키지 파일이 손상되었습니다', 'The package file is damaged'));
+      throw e;
+    }
+  }
+  async function readZipInner(bytes, inflateRaw, limits) {
     var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     var eocd = -1;
     for (var i = bytes.length - 22; i >= Math.max(0, bytes.length - 65557); i--) { if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
     if (eocd < 0) throw new Error(T('ZIP 형식이 아닙니다 (끝 레코드 없음)', 'Not a ZIP file (no end record)'));
     var count = dv.getUint16(eocd + 10, true), cdOff = dv.getUint32(eocd + 16, true);
-    var files = {}, p = cdOff;
+    if (count > limits.files) throw new Error(T('ZIP 안의 파일이 너무 많습니다: ', 'Too many files in the ZIP: ') + count);
+    var files = Object.create(null), p = cdOff, total = 0;
     for (var n = 0; n < count; n++) {
+      if (p + 46 > bytes.length) throw new Error(T('ZIP 중앙 디렉터리가 손상되었습니다', 'ZIP central directory is damaged'));
       if (dv.getUint32(p, true) !== 0x02014b50) throw new Error(T('ZIP 중앙 디렉터리가 손상되었습니다', 'ZIP central directory is damaged'));
       var flags = dv.getUint16(p + 8, true), method = dv.getUint16(p + 10, true);
-      var csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+      var crc = dv.getUint32(p + 16, true), csize = dv.getUint32(p + 20, true), usize = dv.getUint32(p + 24, true);
+      var nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
       var loff = dv.getUint32(p + 42, true);
       var nameBytes = bytes.subarray(p + 46, p + 46 + nlen);
-      var name = (flags & 0x800) ? utf8Decode(nameBytes) : utf8Decode(nameBytes);
+      var name = decodeName(nameBytes, flags, bytes.subarray(p + 46 + nlen, p + 46 + nlen + xlen)).normalize('NFC');
       p += 46 + nlen + xlen + clen;
       if (/\/$/.test(name)) continue;
       if (flags & 1) throw new Error(T('암호화된 ZIP은 지원하지 않습니다: ', 'Encrypted ZIP is not supported: ') + name);
+      if (usize > limits.entry || (total += usize) > limits.total) throw new Error(T('ZIP을 풀면 너무 큽니다: ', 'The ZIP expands to more than the allowed size: ') + name);
+      if (loff + 30 > bytes.length) throw new Error(T('ZIP이 손상되었습니다: ', 'The ZIP is damaged: ') + name);
       var lnlen = dv.getUint16(loff + 26, true), lxlen = dv.getUint16(loff + 28, true);
       var start = loff + 30 + lnlen + lxlen;
+      if (start + csize > bytes.length) throw new Error(T('ZIP이 손상되었습니다: ', 'The ZIP is damaged: ') + name);
       var comp = bytes.subarray(start, start + csize);
       var data;
-      if (method === 0) data = comp.slice();
-      else if (method === 8) data = inflateRaw ? inflateRaw(comp) : await inflateBrowser(comp);
+      if (method === 0) data = comp;
+      else if (method === 8) data = inflateRaw ? inflateRaw(comp, usize) : await inflateBrowser(comp, usize);
       else throw new Error(T('지원하지 않는 압축 방식(', 'Unsupported compression method (') + method + '): ' + name);
-      files[normalize(name)] = data;
+      if (data.length !== usize || crc32(data) !== crc) throw new Error(T('ZIP 항목이 손상되었습니다(크기·CRC 불일치): ', 'ZIP entry is damaged (size or CRC mismatch): ') + name);
+      var key = normalize(name);
+      if (!key || isOutside(key)) continue; // never let an entry point outside the package
+      files[key] = data;
     }
     return files;
   }
-  async function inflateBrowser(comp) {
+  async function inflateBrowser(comp, max) {
     if (typeof DecompressionStream === 'undefined') throw new Error(T('이 브라우저는 ZIP 압축 해제를 지원하지 않습니다 (최신 Chrome/Edge/Safari/Firefox 필요)', 'This browser cannot unzip (needs a recent Chrome/Edge/Safari/Firefox)'));
-    var ds = new DecompressionStream('deflate-raw');
-    var stream = new Blob([comp]).stream().pipeThrough(ds);
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+    var reader = new Blob([comp]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+    var out = new Uint8Array(max), pos = 0;
+    for (;;) {
+      var r = await reader.read();
+      if (r.done) break;
+      if (pos + r.value.length > max) { reader.cancel(); throw new Error(T('ZIP 항목이 선언된 크기보다 큽니다', 'A ZIP entry is larger than declared')); }
+      out.set(r.value, pos); pos += r.value.length;
+    }
+    return pos === max ? out : out.subarray(0, pos);
   }
 
   // ---------------------------------------------------------------- package helpers
   function findEntry(files) {
-    if (files['manifest.json']) {
+    if (own(files, 'manifest.json')) {
       try {
-        var m = JSON.parse(utf8Decode(files['manifest.json']));
-        if (m.entry && files[normalize(m.entry)]) return { entry: normalize(m.entry), manifest: m };
+        var m = JSON.parse(utf8Decode(own(files, 'manifest.json')));
+        if (m && typeof m.entry === 'string' && own(files, normalize(m.entry))) return { entry: normalize(m.entry), manifest: m };
       } catch (e) { }
     }
-    if (files['index.html']) return { entry: 'index.html', manifest: null };
-    var htmls = Object.keys(files).filter(function (k) { return /\.html?$/i.test(k); }).sort(function (a, b) { return a.split('/').length - b.split('/').length; });
+    if (own(files, 'index.html')) return { entry: 'index.html', manifest: null };
+    var derived = function (k) { return /_(deckwright|hdeck|single)\.html?$/i.test(k) ? 1 : 0; };
+    var htmls = Object.keys(files).filter(function (k) { return /\.html?$/i.test(k); }).sort(function (a, b) {
+      return (a.split('/').length - b.split('/').length) || (derived(a) - derived(b)) || (a < b ? -1 : a > b ? 1 : 0);
+    });
     return htmls.length ? { entry: htmls[0], manifest: null } : null;
   }
 
@@ -420,14 +528,15 @@
     opts = opts || {};
     var found = findEntry(files);
     if (!found) throw new Error(T('패키지 안에 HTML 파일이 없습니다', 'No HTML file in the package'));
-    var html = utf8Decode(files[found.entry]);
+    var dec = decodeHTML(own(files, found.entry)), html = dec.html;
     var r = await inlineHTML(html, {
       path: found.entry,
-      read: function (p) { return files[p] || null; },
+      read: function (p) { return own(files, p) || null; },
       urlFor: opts.urlFor
     });
     var out = runtimeSrc ? injectRuntime(r.html, runtimeSrc) : r.html;
-    return { html: out, entry: found.entry, manifest: found.manifest, external: r.external, missing: r.missing };
+    if (dec.converted) r.warnings.unshift(T('문자 인코딩 ' + dec.charset + '을(를) UTF-8로 바꿨습니다', 'Converted the text encoding from ' + dec.charset + ' to UTF-8'));
+    return { html: out, entry: found.entry, manifest: found.manifest, external: r.external, missing: r.missing, outside: r.outside, warnings: r.warnings, used: r.used };
   }
 
   // ---------------------------------------------------------------- lint
@@ -443,6 +552,8 @@
       add('warn', T('외부 ' + kind + ' 참조: ' + u + ' — 인터넷이 없는 곳에서는 깨집니다. 로컬 파일로 바꾸세요.', 'External ' + kind + ': ' + u + ' — breaks without internet. Use a local file.'));
     });
     (report && report.missing || []).forEach(function (p) { add('error', T('파일을 찾을 수 없습니다: ', 'File not found: ') + p); });
+    (report && report.outside || []).forEach(function (p) { add('error', T('덱 폴더 밖의 파일이라 넣지 않았습니다: ', 'Outside the deck folder, not included: ') + p + T(' (덱 폴더 안으로 옮기세요)', ' (move it into the deck folder)')); });
+    (report && report.warnings || []).forEach(function (w) { add('warn', w); });
     if (/\b\d+(\.\d+)?v[wh]\b/.test(html) && info.staged) add('info', T('vw/vh 단위가 있습니다. 고정 무대(data-hdek) 덱에서는 px 단위가 화면 비율 변화에 더 안전합니다.', 'Uses vw/vh units. In a fixed-stage (data-hdek) deck, px units are safer across screen ratios.'));
     if (/Math\.random\(/.test(html)) add('info', T('Math.random()을 쓰고 있습니다. 발표자 창 미리보기와 청중 화면이 다르게 보일 수 있습니다.', 'Uses Math.random(); the presenter preview may differ from the audience screen.'));
     if (/\.(webm|mov|mkv|hevc)\b/i.test(html)) add('warn', T('WebM/MOV 영상은 일부 PC에서 재생되지 않습니다. H.264 MP4를 권장합니다.', 'WebM/MOV video does not play on some PCs. Use H.264 MP4.'));
@@ -453,7 +564,7 @@
     FORMAT: FORMAT, setLang: setLang, mimeOf: mimeOf, dataURL: dataURL, utf8Encode: utf8Encode, utf8Decode: utf8Decode,
     resolvePath: resolvePath, relPath: relPath, isExternal: isExternal,
     inlineHTML: inlineHTML, injectRuntime: injectRuntime, hasRuntime: hasRuntime,
-    scan: scan, buildManifest: buildManifest, lint: lint,
-    crc32: crc32, writeZip: writeZip, readZip: readZip, findEntry: findEntry, packageToHTML: packageToHTML
+    scan: scan, buildManifest: buildManifest, lint: lint, decodeHTML: decodeHTML,
+    crc32: crc32, writeZip: writeZip, readZip: readZip, findEntry: findEntry, packageToHTML: packageToHTML, LIMITS: LIMITS, own: own
   };
 });

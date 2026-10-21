@@ -1,6 +1,6 @@
 {
   "name": "deckwright",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Present AI-generated HTML slide decks like PowerPoint: click steps, presenter view with notes and timer, pen, print to PDF. Single HTML or .hdek package.",
   "keywords": ["presentation", "slides", "html", "presenter-view", "speaker-notes", "claude-code", "skill", "hdek"],
   "homepage": "https://github.com/grotyx/deckwright",
@@ -12,7 +12,7 @@
     "deckwright": "skills/deckwright/scripts/deckwright.mjs",
     "hdek": "skills/deckwright/scripts/deckwright.mjs"
   },
-  "files": ["skills", "player", "tools", "SPEC.md", "SPEC.ko.md", "README.md", "README.ko.md", "LICENSE"],
+  "files": ["skills", "SPEC.md", "SPEC.ko.md", "README.md", "README.ko.md", "CHANGELOG.md", "CHANGELOG.ko.md", "LICENSE"],
   "scripts": {
     "build": "node tools/build.mjs",
     "test": "node tools/build.mjs && python3 test/run_tests.py"

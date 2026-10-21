@@ -73,6 +73,7 @@
   var BLOB_MIN = 2 * 1024 * 1024; // assets over 2 MB become blob URLs to save memory
   var Core = window.DeckWrightCore || window.HDeckCore;
   var current = null;
+  var blobs = []; // object URLs made for the current deck, revoked when another deck is opened
   var LANG = /^ko/i.test(navigator.language || '') ? 'ko' : 'en';
   var q = /[?&]hdek-lang=(ko|en)\b/.exec(location.search); if (q) LANG = q[1];
   function T(ko, en) { return LANG === 'ko' ? ko : en; }
@@ -84,25 +85,29 @@
   function showErr(msg) { var e = $('err'); e.textContent = msg; e.style.display = msg ? 'block' : 'none'; }
 
   function urlFor(bytes, mime) {
-    if (bytes.length >= BLOB_MIN) return URL.createObjectURL(new Blob([bytes], { type: mime }));
+    if (bytes.length >= BLOB_MIN) { var u = URL.createObjectURL(new Blob([bytes], { type: mime })); blobs.push(u); return u; }
     return Core.dataURL(bytes, mime);
   }
+  function releaseBlobs() { blobs.forEach(function (u) { URL.revokeObjectURL(u); }); blobs = []; }
+  var RUNTIME_RE = /(hdek|deckwright)-runtime\.js$/;
 
   async function fromFiles(map, label) {
     var found = Core.findEntry(map);
     if (!found) throw new Error(T('HTML 파일을 찾지 못했습니다', 'No HTML file found'));
-    var html = Core.utf8Decode(map[found.entry]);
-    var r = await Core.inlineHTML(html, { path: found.entry, read: function (p) { return map[p] || null; }, urlFor: urlFor });
-    r.missing = r.missing.filter(function (m) { return !/(hdek|deckwright)-runtime\.js$/.test(m); });
+    var dec = Core.decodeHTML(map[found.entry]), html = dec.html;
+    releaseBlobs();
+    var r = await Core.inlineHTML(html, { path: found.entry, read: function (p) { return Core.own(map, p) || null; }, urlFor: urlFor });
+    r.missing = r.missing.filter(function (m) { return !RUNTIME_RE.test(m); });
+    r.outside = r.outside.filter(function (m) { return !RUNTIME_RE.test(m); });
+    if (dec.converted) r.warnings.unshift(T('문자 인코딩 ' + dec.charset + '을(를) UTF-8로 바꿨습니다', 'Converted the text encoding from ' + dec.charset + ' to UTF-8'));
     var res = Core.lint(html, r);
     var out = Core.injectRuntime(r.html, RUNTIME);
-    return { html: out, lint: res, report: r, name: label };
+    return { html: out, source: html, entry: found.entry, map: map, lint: res, report: r, name: label, blobs: blobs.length };
   }
 
   async function readFile(f) { return new Uint8Array(await f.arrayBuffer()); }
 
   async function openFile(f) {
-    showErr('');
     var bytes = await readFile(f);
     var name = f.name;
     var isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
@@ -111,7 +116,7 @@
       return fromFiles(files, name.replace(/\.(hdek|zip)$/i, ''));
     }
     if (/\.html?$/i.test(name)) {
-      var map = {}; map[name] = bytes;
+      var map = Object.create(null); map[name] = bytes;
       var res = await fromFiles(map, name.replace(/\.html?$/i, ''));
       if (res.report.missing.length) {
         var ls = res.report.missing.slice(0, 3).join(', ') + (res.report.missing.length > 3 ? ' …' : '');
@@ -126,7 +131,7 @@
     var arr = Array.prototype.slice.call(list);
     if (arr.length === 1 && !arr[0].webkitRelativePath) return openFile(arr[0]);
     // folder: strip the common top folder and build a relative path map
-    var map = {}, top = null;
+    var map = Object.create(null), top = null;
     for (var i = 0; i < arr.length; i++) {
       var rel = arr[i].webkitRelativePath || arr[i].name;
       var parts = rel.split('/');
@@ -141,6 +146,7 @@
 
   async function readEntry(entry, prefix, map) {
     if (entry.isFile) {
+      if (/^\./.test(entry.name)) return;
       var f = await new Promise(function (res, rej) { entry.file(res, rej); });
       map[prefix + entry.name] = await readFile(f);
     } else if (entry.isDirectory) {
@@ -157,7 +163,7 @@
     var items = dt.items ? Array.prototype.slice.call(dt.items) : [];
     var entries = items.map(function (it) { return it.webkitGetAsEntry ? it.webkitGetAsEntry() : null; }).filter(Boolean);
     if (entries.length === 1 && entries[0].isDirectory) {
-      var map = {};
+      var map = Object.create(null);
       var reader = entries[0].createReader(), batch;
       do {
         batch = await new Promise(function (res, rej) { reader.readEntries(res, rej); });
@@ -192,23 +198,44 @@
     document.close();
   }
 
-  function saveSingle() {
+  async function saveSingle() {
     if (!current) return;
-    if (/blob:/.test(current.html)) { alert(T('큰 영상이 포함되어 있어 단독 HTML 저장은 명령줄 도구(deckwright build)를 써 주세요.', 'This deck has large videos. Use the command-line tool (deckwright build) to save a single HTML.')); return; }
+    var html = current.html;
+    if (current.blobs) {
+      // large assets were kept as blob URLs for presenting; a saved file needs them inline
+      try {
+        var map = current.map;
+        var r = await Core.inlineHTML(current.source, { path: current.entry, read: function (p) { return Core.own(map, p) || null; } });
+        html = Core.injectRuntime(r.html, RUNTIME);
+      } catch (e) {
+        alert(T('자원이 너무 커서 HTML 한 개로 저장할 수 없습니다. 명령줄 도구로 .hdek 패키지를 만드세요(deckwright pack).', 'The assets are too large for one HTML file. Make a .hdek package with the command-line tool (deckwright pack).'));
+        return;
+      }
+    }
+    var info = current.lint.info;
+    var manifest = Core.buildManifest({ title: info.title || current.name, entry: 'index.html', width: info.width, height: info.height, staged: info.staged, duration: info.duration, slides: info.slides });
+    html = Core.injectRuntime(html, RUNTIME, '<script type="application/hdek+json" id="hdek-manifest">' + JSON.stringify(manifest).replace(/</g, '\\u003c') + '<\/script>');
+    var url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
     var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([current.html], { type: 'text/html' }));
-    a.download = (current.name || 'deck') + '.html';
+    a.href = url;
+    a.download = (current.name || 'deck') + '_single.html';
     document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
   }
 
-  function run(p) { p.then(showInfo).catch(function (e) { console.error(e); showErr(e.message || String(e)); }); }
+  function run(p) {
+    // a new load replaces the old one, even when it fails
+    current = null; showErr(''); $('info').style.display = 'none';
+    p.then(showInfo).catch(function (e) { console.error(e); current = null; showErr(e.message || String(e)); });
+  }
 
   $('pickFile').onclick = function () { $('file').click(); };
   $('pickDir').onclick = function () { $('dir').click(); };
-  $('file').onchange = function (e) { if (e.target.files.length) run(openFileList(e.target.files)); };
-  $('dir').onchange = function (e) { if (e.target.files.length) run(openFileList(e.target.files)); };
+  // reset the input so choosing the same file again still loads it
+  $('file').onchange = function (e) { var l = e.target.files; if (l.length) run(openFileList(l).finally(function () { e.target.value = ''; })); };
+  $('dir').onchange = function (e) { var l = e.target.files; if (l.length) run(openFileList(l).finally(function () { e.target.value = ''; })); };
   $('start').onclick = present;
-  $('save').onclick = saveSingle;
+  $('save').onclick = function () { saveSingle().catch(function (e) { showErr(e.message || String(e)); }); };
   var drop = $('drop');
   ['dragenter', 'dragover'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
   ['dragleave', 'drop'].forEach(function (t) { document.addEventListener(t, function (e) { e.preventDefault(); if (t === 'dragleave' && e.relatedTarget) return; drop.classList.remove('over'); }); });
