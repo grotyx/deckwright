@@ -14,7 +14,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const Core = require(path.join(ROOT, 'core', 'deckwright-core.js'));
 const RUNTIME_PATH = path.join(ROOT, 'runtime', 'deckwright-runtime.js');
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 // Messages follow the system locale (Korean if the locale starts with "ko"); override with DECKWRIGHT_LANG=ko|en
 const LANG = (() => {
@@ -29,7 +29,7 @@ const RUNTIME_FILE_RE = /(hdek|deckwright)-runtime\.js$/;
 
 function usage() {
   console.log(t(
-`${C.b}DeckWright ${VERSION}${C.x} — HTML 발표 파일 도구 (.html / .hdek)
+`${C.b}deckwright ${VERSION}${C.x} — HTML 발표 파일 도구 (.html / .hdek)
 
 사용법:
   deckwright inject <파일.html> [-o 출력.html] 원본 옆에 두는 발표용 HTML (런타임만 넣고 그림·영상은 원래 폴더 참조)
@@ -42,7 +42,7 @@ function usage() {
   deckwright runtime [-o 파일.js]             런타임 JS만 꺼내기
 
 <입력>은 HTML 파일, index.html이 있는 폴더, 또는 .hdek 파일입니다.`,
-`${C.b}DeckWright ${VERSION}${C.x} — tools for HTML presentation files (.html / .hdek)
+`${C.b}deckwright ${VERSION}${C.x} — tools for HTML presentation files (.html / .hdek)
 
 Usage:
   deckwright inject <file.html> [-o out.html] Presentable HTML next to the original (runtime only; images/video stay in place)
@@ -137,7 +137,7 @@ async function cmdInject(a) {
   const src = a._[0];
   if (!src || !/\.html?$/i.test(src)) throw new Error(t('HTML 파일을 지정하세요', 'Specify an HTML file'));
   const html = fs.readFileSync(src, 'utf8');
-  const out = path.resolve(a.out || src.replace(/\.html?$/i, '_DeckWright.html'));
+  const out = path.resolve(a.out || src.replace(/\.html?$/i, '_deckwright.html'));
   if (out === path.resolve(src)) throw new Error(t('원본을 덮어쓸 수 없습니다', 'Refusing to overwrite the original'));
   if (path.dirname(out) !== path.dirname(path.resolve(src))) console.log(`${C.y}  ! ${t('출력이 원본과 다른 폴더입니다. 그림·영상 경로가 맞지 않을 수 있습니다.', 'Output is in a different folder from the original; relative image/video paths may break.')}${C.x}`);
   fs.writeFileSync(out, Core.injectRuntime(html, runtimeSrc()));

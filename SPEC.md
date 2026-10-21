@@ -1,8 +1,8 @@
-# DeckWright contract v1 (hdek/1)
+# deckwright contract v1 (hdek/1)
 
 English · [한국어](SPEC.ko.md)
 
-DeckWright is a small contract for presenting HTML slide decks like PowerPoint. This document defines three things: how slides and click steps are marked up in HTML; the two file forms that carry a deck (a single `.html` and a `.hdek` package); and the agreement between the runtime and the deck.
+deckwright is a small contract for presenting HTML slide decks like PowerPoint. This document defines three things: how slides and click steps are marked up in HTML; the two file forms that carry a deck (a single `.html` and a `.hdek` package); and the agreement between the runtime and the deck.
 
 The runtime opens HTML that follows none of this as well as it can (see section 6), but decks that follow the contract get exact step navigation, going back, presenter previews and printing.
 
@@ -25,7 +25,7 @@ Every screen must be reproducible from two integers, `(slide, step)`. Going forw
 
 | Attribute | On | Meaning |
 |---|---|---|
-| `data-hdek` | deck root | Marks a DeckWright deck. A fixed stage (default 1920×1080) is scaled to fit the screen; the rest is filled with black |
+| `data-hdek` | deck root | Marks a deckwright deck. A fixed stage (default 1920×1080) is scaled to fit the screen; the rest is filled with black |
 | `data-width`, `data-height` | root | Stage size in px. Default 1920×1080 |
 | `data-fit="none"` | root | Turn off stage scaling and leave the deck responsive |
 | `data-duration` | root | Target talk length in minutes. The presenter timer shows time remaining |
@@ -84,7 +84,7 @@ One HTML file with the runtime and every asset (CSS, images, fonts, video) inlin
 ```html
 <script type="application/hdek+json" id="hdek-manifest">{ "format": "hdek/1", ... }</script>
 ...
-<script data-hdek-runtime> /* DeckWright runtime */ </script>
+<script data-hdek-runtime> /* deckwright runtime */ </script>
 ```
 
 ### 4.2 Package (`.hdek`)
@@ -170,7 +170,7 @@ Without `data-slide`, the runtime looks at the deck's shape and picks one of thr
 
 **Everything else (heuristic mode).** Repeated elements such as `section.slide`, `.slide`, `.scene`, `.slides > section`, `main > section` or `body > section` (two or more) are taken as slides. `data-step` and initially hidden `.step` / `.fragment` elements are steps (a `.step` that is visible from the start is treated as decoration and left alone). Notes come from `aside.notes`, `aside.note`, `.notes` or `.speaker-notes` inside or right after a slide. Responsive decks built in `vw`/`vh` are shown as they are, without scaling.
 
-reveal.js decks are recognized automatically: reveal's own navigation and fragments are used, and DeckWright adds the presenter view, ink and blackout (experimental).
+reveal.js decks are recognized automatically: reveal's own navigation and fragments are used, and deckwright adds the presenter view, ink and blackout (experimental).
 
 Slide titles come from `h1`–`h3`, then from `title` / `chip`-like classes, then from the shortest line with the largest font on the slide.
 

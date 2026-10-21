@@ -3,9 +3,9 @@ name: deckwright
 description: Make HTML slide decks that present like PowerPoint (click steps, presenter view with notes/next slide/timer, pen, print to PDF), or make an existing AI-generated HTML deck presentable. Use for conference talks, lectures and seminars built in HTML, and for packaging them as one self-contained .html, a .hdek package, or PDF/PPTX backups.
 ---
 
-# DeckWright
+# deckwright
 
-DeckWright is a small runtime plus a file contract that lets an HTML deck be presented like PowerPoint. A deck built with it opens by double-click, advances with click / wheel / arrow keys / a clicker, reveals click steps, opens a presenter view with `S` (current + next slide, notes, timer), draws with `D`, and prints one page per slide with every step revealed. No install and no network are needed at presentation time.
+deckwright is a small runtime plus a file contract that lets an HTML deck be presented like PowerPoint. A deck built with it opens by double-click, advances with click / wheel / arrow keys / a clicker, reveals click steps, opens a presenter view with `S` (current + next slide, notes, timer), draws with `D`, and prints one page per slide with every step revealed. No install and no network are needed at presentation time.
 
 Everything this skill needs is inside this folder:
 
@@ -22,13 +22,13 @@ Run the CLI as `node <this skill folder>/scripts/deckwright.mjs <command> …`. 
 
 ## Pick the job
 
-**A. The user already has an HTML deck** (made by any AI or by hand, no DeckWright markup):
+**A. The user already has an HTML deck** (made by any AI or by hand, no deckwright markup):
 
 1. `node scripts/deckwright.mjs check <deck.html or folder>` to see what it detects (slides, external assets).
-2. `node scripts/deckwright.mjs inject <deck.html>` writes `<name>_DeckWright.html` next to the original. It only adds the runtime; images and videos still load from the original folder, and the original file is not touched. This is the lightest option and the right default.
+2. `node scripts/deckwright.mjs inject <deck.html>` writes `<name>_deckwright.html` next to the original. It only adds the runtime; images and videos still load from the original folder, and the original file is not touched. This is the lightest option and the right default.
 3. If the user wants one file to email or carry on USB: `build <input> -o talk.html` (inlines all assets). If the deck has large videos (>50 MB total): `pack <input> -o talk.hdek` and open it with `player.html`.
 
-The runtime auto-detects decks without the contract: decks with their own navigation engine are driven through that engine (their animations are kept), stacked fixed-size slides are scaled to fit, reveal.js decks are recognized, and `.notes` / `aside.notes` become speaker notes. Never rewrite the user's deck just to add DeckWright unless they ask.
+The runtime auto-detects decks without the contract: decks with their own navigation engine are driven through that engine (their animations are kept), stacked fixed-size slides are scaled to fit, reveal.js decks are recognized, and `.notes` / `aside.notes` become speaker notes. Never rewrite the user's deck just to add deckwright unless they ask.
 
 **B. Make a new deck:** follow the steps below.
 

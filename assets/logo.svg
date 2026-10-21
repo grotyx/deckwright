@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- deckwright logo mark (light backgrounds) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect x="58" y="62" width="396" height="34" rx="17" fill="#000405"/>
+  <path d="M84 96H428V340A14 14 0 0 1 414 354H98A14 14 0 0 1 84 340Z" fill="#000405"/>
+  <path d="M110 112H256V328H110Z" fill="#001f45"/>
+  <path d="M196 158C196 150 204 146 211 150L318 213C325 217 325 228 318 232L211 295C204 299 196 295 196 287Z" fill="#ffffff"/>
+  <path d="M244 354H268V404H244Z" fill="#000405"/>
+  <path d="M256 398L176 462M256 398L336 462M256 398V470" stroke="#000405" stroke-width="22" stroke-linecap="round"/>
+</svg>

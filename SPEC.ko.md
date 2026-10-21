@@ -1,8 +1,8 @@
-# DeckWright 규약 v1 (hdek/1)
+# deckwright 규약 v1 (hdek/1)
 
 [English](SPEC.md) · 한국어
 
-DeckWright는 HTML로 만든 발표 자료를 PowerPoint처럼 발표하기 위한 작은 규약입니다. 이 문서는 세 가지를 정합니다. 첫째, HTML 안에서 슬라이드와 클릭 단계를 표시하는 방법. 둘째, 그것을 담는 두 가지 파일 형태(단독 `.html`, 패키지 `.hdek`). 셋째, 런타임이 덱과 주고받는 약속.
+deckwright 는 HTML로 만든 발표 자료를 PowerPoint처럼 발표하기 위한 작은 규약입니다. 이 문서는 세 가지를 정합니다. 첫째, HTML 안에서 슬라이드와 클릭 단계를 표시하는 방법. 둘째, 그것을 담는 두 가지 파일 형태(단독 `.html`, 패키지 `.hdek`). 셋째, 런타임이 덱과 주고받는 약속.
 
 규약을 하나도 지키지 않은 HTML도 런타임이 최대한 추정해서 열지만(휴리스틱 모드), 규약을 지키면 단계 이동·뒤로 가기·발표자 미리보기·인쇄가 정확해집니다.
 
@@ -25,7 +25,7 @@ DeckWright는 HTML로 만든 발표 자료를 PowerPoint처럼 발표하기 위�
 
 | 속성 | 위치 | 의미 |
 |---|---|---|
-| `data-hdek` | 덱 루트 | DeckWright 덱임을 표시. 고정 무대(기본 1920×1080)를 화면에 맞춰 확대·축소하고 남는 부분은 검게 채웁니다 |
+| `data-hdek` | 덱 루트 | deckwright 덱임을 표시. 고정 무대(기본 1920×1080)를 화면에 맞춰 확대·축소하고 남는 부분은 검게 채웁니다 |
 | `data-width`, `data-height` | 루트 | 무대 크기(px). 기본 1920×1080 |
 | `data-fit="none"` | 루트 | 무대 확대·축소를 끄고 반응형으로 둠 |
 | `data-duration` | 루트 | 목표 발표 시간(분). 발표자 창 타이머에 남은 시간 표시 |
@@ -84,7 +84,7 @@ DeckWright는 HTML로 만든 발표 자료를 PowerPoint처럼 발표하기 위�
 ```html
 <script type="application/hdek+json" id="hdek-manifest">{ "format": "hdek/1", ... }</script>
 ...
-<script data-hdek-runtime> /* DeckWright runtime */ </script>
+<script data-hdek-runtime> /* deckwright runtime */ </script>
 ```
 
 ### 4.2 패키지 (`.hdek`)

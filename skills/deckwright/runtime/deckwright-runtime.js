@@ -1,4 +1,4 @@
-/*! DeckWright runtime v0.1.0 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! deckwright runtime v0.1.1 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -6,8 +6,8 @@
   'use strict';
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
-  var PRODUCT = 'DeckWright';
-  var VERSION = '0.1.0';
+  var PRODUCT = 'deckwright';
+  var VERSION = '0.1.1';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 
@@ -38,7 +38,12 @@
     var mm = (h ? String(m).padStart(2, '0') : String(m)), ss = String(s).padStart(2, '0');
     return (h ? h + ':' : '') + mm + ':' + ss;
   }
-  function textOf(el) { return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : ''; }
+  function textOf(el) {
+    if (!el) return '';
+    var t = el.textContent || '';
+    if (el.querySelector && el.querySelector('br')) { var c = el.cloneNode(true); Array.prototype.forEach.call(c.querySelectorAll('br'), function (br) { br.replaceWith(' '); }); t = c.textContent || ''; }
+    return t.replace(/\s+/g, ' ').trim();
+  }
   function topLevel(els) {
     return els.filter(function (el) {
       return !els.some(function (o) { return o !== el && o.contains(el); });
@@ -88,15 +93,15 @@
     '.hdek-bar button.on{background:#0a84ff;color:#fff}',
     '.hdek-bar button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '.hdek-bar .sep{width:1px;height:22px;background:rgba(255,255,255,.18);margin:0 4px}',
-    '.hdek-bar .sw{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.55)}',
-    '.hdek-bar button.swb.on{background:rgba(255,255,255,.18)}',
-    '.hdek-bar .num{min-width:52px;text-align:center;font-variant-numeric:tabular-nums;color:#c9c9cf;font-size:13px}',
+    '.hdek-bar .hdek-sw{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.55)}',
+    '.hdek-bar button.hdek-swb.on{background:rgba(255,255,255,.18)}',
+    '.hdek-bar .hdek-num{min-width:52px;text-align:center;font-variant-numeric:tabular-nums;color:#c9c9cf;font-size:13px}',
     '.hdek-toast{left:50%;bottom:28px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;background:rgba(20,20,24,.92);max-width:80vw;opacity:0;transition:opacity .25s;pointer-events:none}',
     '.hdek-toast.show{opacity:1}',
     '.hdek-goto{right:24px;bottom:24px;padding:8px 14px;border-radius:10px;background:rgba(20,20,24,.92);font-size:20px;display:none}',
     '.hdek-help{inset:0;background:rgba(0,0,0,.72);display:none;place-items:center}',
     '.hdek-help.on{display:grid}',
-    '.hdek-help .card{background:#18181c;border-radius:16px;padding:24px 28px;min-width:420px;max-width:86vw;box-shadow:0 20px 60px rgba(0,0,0,.5)}',
+    '.hdek-help .hdek-card{background:#18181c;border-radius:16px;padding:24px 28px;min-width:420px;max-width:86vw;box-shadow:0 20px 60px rgba(0,0,0,.5)}',
     '.hdek-help h3{margin:0 0 12px;font-size:17px}',
     '.hdek-help table{border-collapse:collapse;font-size:14px}',
     '.hdek-help td{padding:4px 18px 4px 0;vertical-align:top}',
@@ -842,10 +847,10 @@
     blankEl = document.createElement('div'); blankEl.className = 'hdek-blank'; document.body.appendChild(blankEl);
     bar = document.createElement('div'); bar.className = 'hdek-ui hdek-bar';
     var html = '' +
-      btn('prev', T('이전 (←)', 'Previous (←)')) + '<span class="num"></span>' + btn('next', T('다음 (→)', 'Next (→)')) +
+      btn('prev', T('이전 (←)', 'Previous (←)')) + '<span class="hdek-num"></span>' + btn('next', T('다음 (→)', 'Next (→)')) +
       '<span class="sep"></span>' +
       btn('pen', T('펜 (D)', 'Pen (D)'), 'pen') + btn('hl', T('형광펜 (H)', 'Highlighter (H)'), 'hl') + btn('laser', T('레이저 (L)', 'Laser (L)'), 'laser') + btn('eraser', T('지우개 (E)', 'Eraser (E)'), 'eraser') +
-      COLORS.slice(0, 4).map(function (c) { return '<button class="swb" data-color="' + c + T('" title="색"><span class="sw" style="background:', '" title="Color"><span class="sw" style="background:') + c + '"></span></button>'; }).join('') +
+      COLORS.slice(0, 4).map(function (c) { return '<button class="hdek-swb" data-color="' + c + T('" title="색"><span class="hdek-sw" style="background:', '" title="Color"><span class="hdek-sw" style="background:') + c + '"></span></button>'; }).join('') +
       btn('clear', T('이 슬라이드 필기 지우기 (C)', 'Clear ink on this slide (C)')) +
       '<span class="sep"></span>' +
       btn('blank', T('검은 화면 (B)', 'Black screen (B)')) + btn('presenter', T('발표자 창 (S)', 'Presenter view (S)')) + btn('full', T('전체화면 / 프로젝터 (F)', 'Fullscreen / projector (F)')) + btn('help', T('단축키 (?)', 'Shortcuts (?)'));
@@ -875,7 +880,7 @@
   function updateBar() {
     if (!bar) return;
     var A = adapter(), s = D.state;
-    var num = bar.querySelector('.num');
+    var num = bar.querySelector('.hdek-num');
     if (num) num.textContent = (s.slide + 1) + ' / ' + A.count();
     $$('button[data-tool]', bar).forEach(function (b) { b.classList.toggle('on', b.dataset.tool === D.tool); });
     $$('button[data-color]', bar).forEach(function (b) { b.classList.toggle('on', b.dataset.color === D.color); });
@@ -893,7 +898,7 @@
       [T('도구 끄기', 'Tool off'), '<kbd>Esc</kbd>'],
       [T('인쇄 · PDF', 'Print · PDF'), T('<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd> (모든 단계가 펼쳐진 상태로)', '<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd> (every step revealed)')]
     ];
-    return '<div class="card"><h3>' + PRODUCT + T(' 단축키</h3><table>', ' shortcuts</h3><table>') + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('') + '</table></div>';
+    return '<div class="hdek-card"><h3>' + PRODUCT + T(' 단축키</h3><table>', ' shortcuts</h3><table>') + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('') + '</table></div>';
   }
 
   var toastTimer = null;

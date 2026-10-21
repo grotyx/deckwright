@@ -36,6 +36,7 @@ run('pack', 'examples/demo', '-o', 'dist/demo.hdek');
 run('build', 'examples/ai-style/index.html', '-o', 'dist/ai-style.html');
 fs.copyFileSync(path.join(dist, 'demo.html'), path.join(docs, 'demo.html'));
 fs.copyFileSync(path.join(dist, 'demo.hdek'), path.join(docs, 'demo.hdek'));
+for (const n of ['logo.png', 'logo-dark.png']) fs.copyFileSync(path.join(ROOT, 'assets', n), path.join(docs, n));
 console.log('✓ player.html (' + Math.round(player.length / 1024) + ' KB) → dist/, docs/, skills/deckwright/');
 
 // Skill zip for claude.ai (Settings → Capabilities → Skills → Upload) and manual installs

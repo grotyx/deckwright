@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DeckWright demo</title>
+<title>deckwright demo</title>
 <style>
   :root{
     --bg:#0b1020; --ink:#eef1f8; --muted:#9aa4bd; --accent:#4cc2ff; --accent2:#ffb547; --good:#3ddc97;
@@ -58,15 +58,16 @@
   .swap .a{background:#ff5a5222;border:2px solid #ff5a52}
   .swap .b{background:#3ddc9722;border:2px solid #3ddc97}
   .end h1{background:linear-gradient(90deg,#4cc2ff,#a06bff,#ffb547);-webkit-background-clip:text;background-clip:text;color:transparent}
+  @media print{.card .b{display:none}} /* 3D flip faces do not print reliably */
   kbd{font:600 30px ui-monospace,Menlo,Consolas,monospace;padding:4px 14px;border-radius:10px;background:#ffffff1a;border:1px solid #ffffff33}
 </style>
 </head>
 <body>
-<main class="deck" data-hdek data-width="1920" data-height="1080" data-duration="10" data-title="DeckWright demo">
+<main class="deck" data-hdek data-width="1920" data-height="1080" data-duration="10" data-title="deckwright demo">
 
   <section data-slide="title" class="s-title">
     <span class="tag">Plain HTML, presented like PowerPoint</span>
-    <h1>DeckWright<br>presentation runtime</h1>
+    <h1>deckwright<br>presentation runtime</h1>
     <p class="lead">Advance with →, click, wheel or a clicker · <kbd>S</kbd> presenter view · <kbd>?</kbd> help</p>
     <div class="orb"></div>
     <aside class="notes">This is the title slide. The rising title animation replays every time you enter the slide.

@@ -1,4 +1,4 @@
-/*! DeckWright core v0.1.0 | MIT License | https://github.com/grotyx/deckwright
+/*! deckwright core v0.1.1 | MIT License | https://github.com/grotyx/deckwright
  *  Shared by player.html (browser) and the CLI (Node):
  *  runtime injection, local asset inlining, .hdek (ZIP) read/write, manifest, static checks.
  */
@@ -244,7 +244,7 @@
   }
 
   // ---------------------------------------------------------------- runtime injection
-  function hasRuntime(html) { return /<script\b[^>]*\bdata-hdek-runtime\b[^>]*>(?!\s*<\/script)/i.test(html) && /(DeckWright|HDeck) runtime/.test(html); }
+  function hasRuntime(html) { return /<script\b[^>]*\bdata-hdek-runtime\b[^>]*>(?!\s*<\/script)/i.test(html) && /(deckwright|hdeck) runtime/i.test(html); }
 
   function injectRuntime(html, runtimeSrc, extraHead) {
     var code = runtimeSrc.replace(/<\/script/gi, '<\\/script');

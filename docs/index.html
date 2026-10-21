@@ -3,62 +3,91 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DeckWright</title>
-<meta name="description" content="Present AI-generated HTML slide decks like PowerPoint: click steps, presenter view with notes and timer, pen, print to PDF.">
+<title>deckwright</title>
+<meta name="description" content="Present AI-generated HTML slide decks like PowerPoint: click steps, presenter view with notes and timer, pen, print to PDF. One HTML file, no install, no internet.">
 <link rel="icon" href="icon.png">
 <style>
-  :root{--bg:#0b1020;--card:#141a2e;--ink:#eef1f8;--muted:#9aa4bd;--accent:#4cc2ff;--line:#ffffff1a}
-  @media (prefers-color-scheme: light){:root{--bg:#f6f7fb;--card:#fff;--ink:#141824;--muted:#5b6478;--accent:#1f6feb;--line:#1418241a}}
+  :root{--bg:#ffffff;--soft:#f5f6f8;--ink:#0b0d10;--muted:#5b6270;--navy:#001f45;--line:#e3e6eb;--chip:#111111;--chipink:#ffffff}
+  @media (prefers-color-scheme: dark){:root{--bg:#0d1117;--soft:#161b22;--ink:#f0f0f0;--muted:#9aa3b2;--navy:#78a0dc;--line:#30363d;--chip:#f0f0f0;--chipink:#0d1117}}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 "Inter","Segoe UI","Helvetica Neue",system-ui,sans-serif}
-  .wrap{max-width:960px;margin:0 auto;padding:56px 16px 80px}
-  header{display:flex;align-items:center;gap:16px;margin-bottom:12px}
-  header img{width:56px;height:56px}
-  h1{font-size:40px;margin:0;letter-spacing:-.5px}
-  .lead{font-size:20px;color:var(--muted);margin:0 0 32px}
-  .actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:40px}
-  .actions a{display:block;padding:18px 20px;border-radius:14px;background:var(--card);border:1px solid var(--line);color:inherit;text-decoration:none}
-  .actions a:hover{border-color:var(--accent)}
-  .actions b{display:block;font-size:18px;margin-bottom:4px}
-  .actions span{color:var(--muted);font-size:15px}
-  img.shot{width:100%;border-radius:14px;border:1px solid var(--line);display:block}
-  h2{font-size:24px;margin:44px 0 12px}
-  ul{padding-left:1.2em} li{margin:4px 0}
-  code,kbd{font:14px ui-monospace,Menlo,Consolas,monospace;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
-  pre{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto}
-  pre code{border:0;padding:0;background:none}
-  footer{margin-top:56px;color:var(--muted);font-size:14px}
-  a{color:var(--accent)}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.65 "Inter","Segoe UI","Helvetica Neue",system-ui,sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:56px 16px 72px}
+  header{text-align:center}
+  header picture img{width:132px;height:132px}
+  h1{font-size:44px;letter-spacing:-.8px;margin:6px 0 4px}
+  .tag{font-style:italic;color:var(--muted);margin:0 0 18px}
+  .one{font-weight:650;margin:0}
+  .sub{color:var(--muted);font-size:15px;margin:4px 0 26px}
+  .cta{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:44px}
+  .cta a{padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:600;border:1px solid var(--line);color:var(--ink);background:var(--soft)}
+  .cta a.primary{background:var(--chip);color:var(--chipink);border-color:var(--chip)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}}
+  figure{margin:0}
+  figure img{width:100%;display:block;border-radius:12px;border:1px solid var(--line)}
+  figcaption{text-align:center;font-weight:600;font-size:15px;margin-top:8px}
+  h2{font-size:24px;margin:52px 0 12px;letter-spacing:-.3px}
+  p{margin:0 0 12px}
+  pre{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto;font:14px/1.55 ui-monospace,Menlo,Consolas,monospace}
+  code,kbd{font:14px ui-monospace,Menlo,Consolas,monospace}
+  kbd{padding:1px 6px;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;background:var(--soft)}
+  table{border-collapse:collapse;width:100%;font-size:15px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  a{color:var(--navy)}
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:14px;text-align:center}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header><img src="icon.png" alt=""><h1>DeckWright</h1></header>
-  <p class="lead">Present AI-generated HTML slide decks like PowerPoint. Click steps, a presenter view with notes and timer, a pen, and print to PDF, all inside one HTML file. No install, no internet.</p>
+  <header>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="logo-dark.png">
+      <img src="logo.png" alt="deckwright logo">
+    </picture>
+    <h1>deckwright</h1>
+    <p class="tag">Your slides on their screen. Your notes on yours.</p>
+    <p class="one">Click steps · presenter view · pen · print to PDF · one HTML file, no install, no internet</p>
+    <p class="sub">Present the HTML decks your AI makes the way you present PowerPoint.</p>
+    <div class="cta">
+      <a class="primary" href="demo.html">Open the demo deck</a>
+      <a href="player.html">Open the player</a>
+      <a href="https://github.com/grotyx/deckwright">GitHub</a>
+      <a href="https://github.com/grotyx/deckwright/blob/main/README.ko.md">한국어</a>
+    </div>
+  </header>
 
-  <div class="actions">
-    <a href="demo.html"><b>Open the demo deck →</b><span>Press <kbd>S</kbd> for the presenter view, <kbd>?</kbd> for shortcuts</span></a>
-    <a href="player.html"><b>Open the player →</b><span>Drop a .hdek package, an .html file or a deck folder</span></a>
-    <a href="https://github.com/grotyx/deckwright"><b>GitHub →</b><span>Install the skill, CLI and spec (MIT)</span></a>
+  <div class="grid">
+    <figure><img src="images/en/presenter.png" alt="Presenter view with current and next slide, notes and timer"><figcaption>Presenter view on your laptop</figcaption></figure>
+    <figure><img src="images/en/ink.png" alt="Pen annotations on a slide"><figcaption>Pen, highlighter and laser</figcaption></figure>
+    <figure><img src="images/en/print.png" alt="Printed pages with every step revealed"><figcaption>Ctrl+P: every step revealed</figcaption></figure>
+    <figure><img src="images/en/player.png" alt="The deckwright player"><figcaption>Player for .hdek and folders</figcaption></figure>
   </div>
 
-  <img class="shot" src="presenter.png" alt="DeckWright presenter view: current slide, next step preview, speaker notes, timer and pen tools">
+  <h2>Try the demo</h2>
+  <p>Open the <a href="demo.html">demo deck</a>, press <kbd>S</kbd> for the presenter view and <kbd>?</kbd> for every shortcut. Arrow keys, a clicker, the mouse wheel and clicks all advance.</p>
 
-  <h2>Use it with Claude</h2>
-  <pre><code>claude plugin marketplace add grotyx/deckwright
-claude plugin install deckwright@deckwright</code></pre>
-  <p>Then ask: “Make my HTML deck presentable” or “Build a 15-minute conference talk as a DeckWright deck.” Other options (npx skills, manual copy, claude.ai upload) are in the <a href="https://github.com/grotyx/deckwright#install">README</a>.</p>
+  <h2>Install</h2>
+  <table>
+    <tr><th>You use</th><th>Install</th></tr>
+    <tr><td>Claude Code</td><td><code>claude plugin marketplace add grotyx/deckwright</code><br><code>claude plugin install deckwright@deckwright</code></td></tr>
+    <tr><td>Codex, Cursor, opencode …</td><td><code>npx skills add grotyx/deckwright -g</code></td></tr>
+    <tr><td>claude.ai</td><td><a href="deckwright-skill.zip">deckwright-skill.zip</a> → Settings → Capabilities → Skills</td></tr>
+    <tr><td>No AI</td><td><a href="player.html">player.html</a>, or <code>npm install -g github:grotyx/deckwright</code></td></tr>
+  </table>
 
-  <h2>What you get</h2>
-  <ul>
-    <li>Click, wheel, arrow keys and presentation clickers move forward and back, including steps inside a slide. Going back snaps to the previous state without replaying animations.</li>
-    <li>Presenter view on the laptop (current and next slide, notes, elapsed and remaining time) while the projector shows only the slides.</li>
-    <li>Pen, highlighter, laser and eraser on either screen. Pen tablets write right away.</li>
-    <li><kbd>Ctrl/⌘+P</kbd> prints one page per slide with every step revealed.</li>
-    <li>Works on decks that never heard of DeckWright: decks with their own navigation, stacked fixed-size slides and reveal.js are detected automatically.</li>
-  </ul>
+  <h2>Then just ask</h2>
+  <pre>"make this HTML deck presentable"
+"make a 15-minute talk on X as a deckwright deck"
+"make it one file I can email"
+"export a PDF and PPTX backup"</pre>
+  <p>Read the <a href="https://github.com/grotyx/deckwright/blob/main/docs/manual.md">user guide</a> or the <a href="https://github.com/grotyx/deckwright/blob/main/SPEC.md">spec</a>.</p>
 
-  <footer>MIT License · © 2026 Sang-Min Park · <a href="https://github.com/grotyx/deckwright/blob/main/SPEC.md">Spec (hdek/1)</a> · <a href="https://github.com/grotyx/deckwright/blob/main/README.ko.md">한국어</a></footer>
+  <footer>
+    MIT License · © 2026 Sang-Min Park, Seoul National University Bundang Hospital · <a href="https://sangmin.me/">sangmin.me</a><br>
+    Also by the author: <a href="https://github.com/grotyx/Academic_writing_c_claudecode">manuwright</a> · <a href="https://github.com/grotyx/rag-obsidian">Refwright</a>
+  </footer>
 </div>
 </body>
 </html>

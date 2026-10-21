@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DeckWright Player</title>
+<title>deckwright player</title>
 <style>
   :root{--bg:#f4f3ef;--card:#fff;--ink:#1c1c1f;--muted:#6b6b73;--line:#e3e1db;--accent:#1f6feb;--warn:#b45309;--err:#c0262d;--ok:#1a7f4b}
   @media (prefers-color-scheme:dark){:root{--bg:#111114;--card:#1a1a1f;--ink:#ececf0;--muted:#9a9aa5;--line:#2a2a31;--accent:#4c9bff;--warn:#f0a948;--err:#ff6b6b;--ok:#3ddc97}}
@@ -36,7 +36,7 @@
 </head>
 <body>
 <main>
-  <h1>DeckWright Player</h1>
+  <h1>deckwright player</h1>
   <p class="sub" data-en="Present AI-made HTML decks like PowerPoint. No install, no internet needed.">AI가 만든 HTML 발표 파일을 PPT처럼 발표합니다. 설치도, 인터넷도 필요 없습니다.</p>
   <div id="drop">
     <strong data-en="Drop a file or folder here">여기에 파일을 끌어다 놓으세요</strong>
@@ -175,7 +175,7 @@
     $('info').style.display = 'block';
     $('title').textContent = info.title || res.name;
     var kb = res.html.length > 1048576 ? (res.html.length / 1048576).toFixed(1) + ' MB' : Math.round(res.html.length / 1024) + ' KB';
-    $('meta').textContent = (info.contract ? T('DeckWright 규약 · ', 'DeckWright contract · ') : T('규약 없음(자동 인식) · ', 'No contract (auto-detect) · ')) + (info.slides.length ? T('슬라이드 ' + info.slides.length + '개 · ', info.slides.length + ' slides · ') : (info.guess ? T('슬라이드 약 ' + info.guess + '개 · ', '~' + info.guess + ' slides · ') : '')) + (info.staged ? info.width + '×' + info.height + ' · ' : '') + kb;
+    $('meta').textContent = (info.contract ? T('deckwright 규약 · ', 'deckwright contract · ') : T('규약 없음(자동 인식) · ', 'No contract (auto-detect) · ')) + (info.slides.length ? T('슬라이드 ' + info.slides.length + '개 · ', info.slides.length + ' slides · ') : (info.guess ? T('슬라이드 약 ' + info.guess + '개 · ', '~' + info.guess + ' slides · ') : '')) + (info.staged ? info.width + '×' + info.height + ' · ' : '') + kb;
     var ul = $('issues'); ul.innerHTML = '';
     var issues = res.lint.issues.filter(function (x) { return x.level !== 'info' || res.lint.issues.length < 12; });
     if (!issues.length) issues = [{ level: 'ok', msg: T('문제 없음 — 오프라인에서도 그대로 발표할 수 있습니다', 'No problems — ready to present offline') }];
