@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DeckWright demo</title>
+<style>
+  :root{
+    --bg:#0b1020; --ink:#eef1f8; --muted:#9aa4bd; --accent:#4cc2ff; --accent2:#ffb547; --good:#3ddc97;
+    --font:"Inter","Segoe UI","Helvetica Neue",system-ui,sans-serif;
+  }
+  .deck{background:var(--bg);color:var(--ink);font-family:var(--font)}
+  .deck section{padding:110px 140px;display:flex;flex-direction:column;justify-content:center;
+    background:radial-gradient(1200px 700px at 85% 10%,#1a2a55 0%,transparent 60%),radial-gradient(900px 600px at 0% 100%,#2a1640 0%,transparent 55%),var(--bg)}
+  h1{font-size:104px;line-height:1.08;margin:0 0 28px;letter-spacing:-2px}
+  h2{font-size:68px;margin:0 0 48px;letter-spacing:-1px}
+  p.lead{font-size:38px;color:var(--muted);margin:0}
+  .tag{display:inline-block;font-size:24px;padding:8px 18px;border-radius:999px;background:#ffffff14;color:var(--accent);margin-bottom:36px;width:max-content}
+  ul.points{list-style:none;padding:0;margin:0;font-size:44px;line-height:1.5}
+  ul.points li{margin:0 0 22px;padding-left:56px;position:relative}
+  ul.points li::before{content:"";position:absolute;left:0;top:.42em;width:26px;height:26px;border-radius:8px;background:var(--accent)}
+  /* 1: entrance animation (replays every time the slide is entered) */
+  .s-title h1,.s-title p,.s-title .tag{animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
+  .s-title p{animation-delay:.25s}.s-title .tag{animation-delay:.1s}
+  @keyframes rise{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
+  .orb{position:absolute;right:160px;top:220px;width:420px;height:420px;border-radius:50%;
+    background:conic-gradient(from 0deg,#4cc2ff,#a06bff,#ffb547,#4cc2ff);filter:blur(2px);opacity:.85;animation:spin 14s linear infinite}
+  .orb::after{content:"";position:absolute;inset:26px;border-radius:50%;background:var(--bg)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  /* 3: numbers / bars */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:48px;margin-top:10px}
+  .stat{background:#ffffff0d;border:1px solid #ffffff1a;border-radius:28px;padding:44px}
+  .stat .v{font-size:120px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums}
+  .stat .k{font-size:32px;color:var(--muted)}
+  .bars{display:flex;align-items:flex-end;gap:60px;height:430px;margin-top:20px;padding:0 20px;border-bottom:3px solid #ffffff33}
+  .bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .bar i{display:block;width:100%;border-radius:18px 18px 0 0;background:linear-gradient(180deg,var(--accent),#2b6cff);height:0;transition:height 1s cubic-bezier(.2,.7,.2,1)}
+  .bar.post i{background:linear-gradient(180deg,var(--good),#14895c)}
+  .bar b{font-size:40px;margin-bottom:12px}
+  .bar span{font-size:28px;color:var(--muted);margin-top:16px;position:absolute;transform:translateY(60px)}
+  .note-small{font-size:24px;color:#6f7896;margin-top:40px}
+  /* 4: SVG drawing */
+  .draw path{fill:none;stroke:var(--accent2);stroke-width:10;stroke-linecap:round;stroke-dasharray:1600;stroke-dashoffset:1600;transition:stroke-dashoffset 1.6s ease}
+  .draw.is-on path{stroke-dashoffset:0}
+  .draw circle{fill:var(--accent2);opacity:0;transition:opacity .4s .9s}
+  .draw.is-on circle{opacity:1}
+  /* 5: flip cards (clicking them does not advance) */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:40px}
+  .card{height:380px;perspective:1400px;cursor:pointer}
+  .card .in{position:relative;width:100%;height:100%;transition:transform .7s;transform-style:preserve-3d}
+  .card.flip .in{transform:rotateY(180deg)}
+  .card .f,.card .b{position:absolute;inset:0;border-radius:28px;display:grid;place-items:center;text-align:center;padding:30px;backface-visibility:hidden;font-size:40px}
+  .card .f{background:#ffffff10;border:1px solid #ffffff22}
+  .card .b{background:linear-gradient(135deg,#2b6cff,#a06bff);transform:rotateY(180deg);font-size:32px}
+  /* 6: swap */
+  .swap{position:relative;height:300px}
+  .swap > div{position:absolute;inset:0;display:grid;place-items:center;border-radius:28px;font-size:56px;font-weight:700}
+  .swap .a{background:#ff5a5222;border:2px solid #ff5a52}
+  .swap .b{background:#3ddc9722;border:2px solid #3ddc97}
+  .end h1{background:linear-gradient(90deg,#4cc2ff,#a06bff,#ffb547);-webkit-background-clip:text;background-clip:text;color:transparent}
+  kbd{font:600 30px ui-monospace,Menlo,Consolas,monospace;padding:4px 14px;border-radius:10px;background:#ffffff1a;border:1px solid #ffffff33}
+</style>
+</head>
+<body>
+<main class="deck" data-hdek data-width="1920" data-height="1080" data-duration="10" data-title="DeckWright demo">
+
+  <section data-slide="title" class="s-title">
+    <span class="tag">Plain HTML, presented like PowerPoint</span>
+    <h1>DeckWright<br>presentation runtime</h1>
+    <p class="lead">Advance with →, click, wheel or a clicker · <kbd>S</kbd> presenter view · <kbd>?</kbd> help</p>
+    <div class="orb"></div>
+    <aside class="notes">This is the title slide. The rising title animation replays every time you enter the slide.
+Press S to open the presenter view: current slide, next slide, these notes and a timer.</aside>
+  </section>
+
+  <section data-slide="steps">
+    <h2>One click, one step</h2>
+    <ul class="points">
+      <li data-step data-effect="rise">Add data-step and an element becomes a click step</li>
+      <li data-step data-effect="left">Effects: rise · left · right · zoom · blur · dim</li>
+      <li data-step data-effect="zoom">Going back snaps to the previous state, no replay</li>
+      <li data-step data-effect="blur">The presenter’s “Next” preview shows the next step</li>
+    </ul>
+    <aside class="notes"><p>Four items appear one at a time.</p><ul><li>Press ← and check that it snaps back without flicker</li><li>After the last item, → moves to the next slide</li></ul></aside>
+  </section>
+
+  <section data-slide="numbers" data-steps="2">
+    <h2>Numbers and charts as steps</h2>
+    <div class="stats">
+      <div class="stat"><div class="v" data-count="128">0</div><div class="k">Patients enrolled (sample)</div></div>
+      <div class="stat"><div class="v" data-count="94" data-suffix="%">0</div><div class="k">Follow-up rate (sample)</div></div>
+      <div class="stat"><div class="v" data-count="2.4" data-dec="1">0</div><div class="k">Mean stay, days (sample)</div></div>
+    </div>
+    <div class="bars" style="margin-top:50px;height:330px">
+      <div class="bar"><b data-bar-label>7.1</b><i data-bar="71"></i></div>
+      <div class="bar post"><b data-bar-label>2.3</b><i data-bar="23"></i></div>
+      <div class="bar"><b data-bar-label>6.4</b><i data-bar="64"></i></div>
+      <div class="bar post"><b data-bar-label>1.9</b><i data-bar="19"></i></div>
+    </div>
+    <p class="note-small">Sample data. This slide drives its own steps through a JS hook (hdekHooks).</p>
+    <aside class="notes">Step 1: the numbers count up from zero. Step 2: the bars grow.
+Going back, numbers and bars jump straight to that state. This shows how JS-driven effects follow the same rule.</aside>
+  </section>
+
+  <section data-slide="draw">
+    <h2>SVG line drawing</h2>
+    <svg class="draw" data-step viewBox="0 0 1600 520" width="1600" height="520">
+      <path d="M40 440 C 260 440, 300 120, 520 140 S 820 420, 1040 300 S 1360 80, 1560 100"/>
+      <circle cx="1560" cy="100" r="22"/>
+    </svg>
+    <aside class="notes">Click to draw the curve. Then press D for the pen and write on top. Ink is saved per slide and shows on both the presenter view and the audience screen.</aside>
+  </section>
+
+  <section data-slide="interactive">
+    <h2>Clickable things stay put</h2>
+    <div class="cards">
+      <div class="card" onclick="this.classList.toggle('flip')"><div class="in"><div class="f">Click a card</div><div class="b">Elements with cursor:pointer<br>don’t advance the slide</div></div></div>
+      <div class="card" onclick="this.classList.toggle('flip')"><div class="in"><div class="f">Flip</div><div class="b">You can also mark them<br>with data-interactive</div></div></div>
+      <div class="card" onclick="this.classList.toggle('flip')"><div class="in"><div class="f">Once more</div><div class="b">Click empty space<br>to move on</div></div></div>
+    </div>
+    <aside class="notes">Clicking a card only flips it; clicking empty space advances.</aside>
+  </section>
+
+  <section data-slide="swap">
+    <h2>Appear, then leave</h2>
+    <div class="swap">
+      <div class="a" data-step="1" data-step-out="2" data-effect="zoom">Before (in at step 1, out at step 2)</div>
+      <div class="b" data-step="2" data-effect="zoom">After (in at step 2)</div>
+    </div>
+    <aside class="notes">data-step-out lets you swap a before/after view in the same spot.</aside>
+  </section>
+
+  <section data-slide="end" class="end">
+    <h1>Thank you</h1>
+    <p class="lead">Ctrl/⌘ + P prints a PDF with every step revealed</p>
+    <aside class="notes">Last slide.</aside>
+  </section>
+
+</main>
+
+<script>
+  // This slide draws its steps in JS. Register on a global so it works even if it runs before the runtime.
+  (window.hdekHooks = window.hdekHooks || {})['numbers'] = {
+    steps: 2,
+    setStep: function (n, o) {
+      var slide = o.slide;
+      slide.querySelectorAll('[data-count]').forEach(function (el) {
+        var target = parseFloat(el.dataset.count), dec = +(el.dataset.dec || 0), suf = el.dataset.suffix || '';
+        cancelAnimationFrame(el._raf);
+        var to = n >= 1 ? target : 0;
+        if (!o.animate) { el.textContent = to.toFixed(dec) + (n >= 1 ? suf : ''); return; }
+        var t0 = performance.now(), from = parseFloat(el.textContent) || 0;
+        (function f(t) {
+          var k = Math.min(1, (t - t0) / 1200), e = 1 - Math.pow(1 - k, 3);
+          el.textContent = (from + (to - from) * e).toFixed(dec) + (to ? suf : '');
+          if (k < 1) el._raf = requestAnimationFrame(f);
+        })(t0);
+      });
+      slide.querySelectorAll('[data-bar]').forEach(function (bar) {
+        if (!o.animate) bar.style.transition = 'none';
+        bar.style.height = (n >= 2 ? bar.dataset.bar : 0) + '%';
+        if (!o.animate) { void bar.offsetWidth; bar.style.transition = ''; }
+      });
+      slide.querySelectorAll('[data-bar-label]').forEach(function (b) { b.style.opacity = n >= 2 ? 1 : 0; });
+    }
+  };
+</script>
+<script src="../../skills/deckwright/runtime/deckwright-runtime.js" data-hdek-runtime></script>
+</body>
+</html>

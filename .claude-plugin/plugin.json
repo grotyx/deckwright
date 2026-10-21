@@ -1,0 +1,10 @@
+{
+  "name": "deckwright",
+  "version": "0.1.0",
+  "description": "Present AI-generated HTML slide decks like PowerPoint: click steps, presenter view with notes and timer, pen, print to PDF. Single HTML or .hdek package.",
+  "author": { "name": "Sang-Min Park" },
+  "homepage": "https://github.com/grotyx/deckwright",
+  "repository": "https://github.com/grotyx/deckwright",
+  "license": "MIT",
+  "keywords": ["presentation", "slides", "html", "presenter-view", "speaker-notes", "hdek"]
+}

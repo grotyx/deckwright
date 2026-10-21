@@ -1,0 +1,14 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Stacked pt deck</title>
+<style>
+html{background:#5b6470} body{margin:0;padding:24px 0;font-family:Arial,sans-serif}
+.slide{width:720pt;height:405pt;background:#fff;margin:0 auto 24px;position:relative;overflow:hidden;padding:20pt;box-sizing:border-box}
+.notes{display:none}
+h2{font-size:28pt;margin:0}
+</style></head><body>
+<section class="slide"><h2>Stacked one</h2><p class="fit">fit?</p></section><aside class="notes"><p>노트 1</p></aside>
+<section class="slide"><h2>Stacked two</h2><p class="fit">fit?</p></section><aside class="notes"><p>노트 2</p></aside>
+<section class="slide"><h2>Stacked three</h2><p class="fit">fit?</p></section><aside class="notes"><p>노트 3</p></aside>
+<script>
+// 덱이 load 시점에 각 슬라이드 크기를 재서 맞춤 — 런타임이 미리 숨기면 0이 나와 실패
+window.addEventListener('load',function(){document.querySelectorAll('.slide').forEach(function(s){s.querySelector('.fit').textContent=s.clientHeight>0?'measured':'ZERO';});});
+</script></body></html>

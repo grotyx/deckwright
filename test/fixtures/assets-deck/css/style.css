@@ -1,0 +1,5 @@
+@font-face{font-family:"DejaHD";src:url("../fonts/Deja-Bold.ttf") format("truetype")}
+.bg{background:url('../img/한글 그림.png') center/cover no-repeat}
+h1{font-family:"DejaHD",sans-serif;color:#fff;font-size:120px}
+section{color:#fff;background:#111}
+video{width:960px;border-radius:20px}

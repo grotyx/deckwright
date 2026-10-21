@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talk title</title>
+<style>
+  :root{
+    --bg:#ffffff; --ink:#15171c; --muted:#5d6370; --accent:#1f6feb; --line:#e4e6eb;
+    /* Add CJK fonts here if needed, e.g. "Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR" */
+    --font:"Inter","Segoe UI","Helvetica Neue",system-ui,sans-serif;
+  }
+  .deck{background:var(--bg);color:var(--ink);font-family:var(--font)}
+  .deck section{padding:96px 120px;display:flex;flex-direction:column;justify-content:center;background:var(--bg)}
+  h1{font-size:96px;line-height:1.1;margin:0 0 24px;letter-spacing:-1.5px}
+  h2{font-size:64px;margin:0 0 44px;letter-spacing:-1px}
+  p, li{font-size:40px;line-height:1.5}
+  .muted{color:var(--muted)}
+  ul{margin:0;padding-left:1.1em}
+  li{margin-bottom:16px}
+  .footer{position:absolute;left:120px;right:120px;bottom:48px;display:flex;justify-content:space-between;font-size:22px;color:var(--muted);border-top:2px solid var(--line);padding-top:16px}
+  /* Replays every time the slide is entered (the runtime puts .active on the current slide) */
+  .active .enter{animation:enter .7s cubic-bezier(.2,.7,.2,1) both}
+  .active .enter:nth-child(2){animation-delay:.12s}
+  @keyframes enter{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<main class="deck" data-hdek data-width="1920" data-height="1080" data-duration="7" data-title="Talk title">
+
+  <section data-slide="title">
+    <h1 class="enter">Talk title</h1>
+    <p class="enter muted">Speaker · Affiliation · Meeting 2026</p>
+    <aside class="notes">Greet the audience and state the topic in one sentence.</aside>
+  </section>
+
+  <section data-slide="background">
+    <h2>Background</h2>
+    <ul>
+      <li data-step data-effect="rise">First point</li>
+      <li data-step data-effect="rise">Second point</li>
+      <li data-step data-effect="rise">Third point</li>
+    </ul>
+    <div class="footer"><span>Talk title</span><span>2</span></div>
+    <aside class="notes">Reveal and explain one point per click.</aside>
+  </section>
+
+  <section data-slide="thanks">
+    <h1 class="enter">Thank you</h1>
+    <p class="enter muted">Questions and discussion</p>
+    <aside class="notes">Take questions.</aside>
+  </section>
+
+</main>
+<script src="deckwright-runtime.js" data-hdek-runtime></script>
+</body>
+</html>

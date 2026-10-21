@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>A typical AI-made HTML deck (no contract)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Segoe UI","Helvetica Neue",sans-serif; background: #f6f4ef; color: #1d1d1f; overflow: hidden; }
+  .slide { position: absolute; inset: 0; width: 100vw; height: 100vh; padding: 8vh 9vw; display: flex; flex-direction: column; justify-content: center; opacity: 0; transition: opacity .6s ease; pointer-events: none; }
+  .slide.active { opacity: 1; pointer-events: auto; }
+  .slide h1 { font-size: 6vw; letter-spacing: -0.03em; }
+  .slide h2 { font-size: 4vw; margin-bottom: 4vh; }
+  .slide p { font-size: 2.2vw; color: #555; margin-top: 2vh; }
+  .animate-in { opacity: 0; transform: translateY(30px); }
+  .slide.active .animate-in { animation: fadeUp .8s ease forwards; }
+  .slide.active .animate-in:nth-child(2) { animation-delay: .2s; }
+  .slide.active .animate-in:nth-child(3) { animation-delay: .4s; }
+  @keyframes fadeUp { to { opacity: 1; transform: none; } }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3vw; }
+  .box { background: #fff; border-radius: 1.5vw; padding: 3vw; box-shadow: 0 1vw 3vw rgba(0,0,0,.08); font-size: 1.8vw; }
+  .box b { display: block; font-size: 3.5vw; color: #c2410c; }
+  .fragment { opacity: 0; transition: opacity .4s; }
+  .fragment.visible { opacity: 1; }
+  .progress { position: fixed; left: 0; bottom: 0; height: 6px; background: #c2410c; transition: width .4s; }
+  .nav-hint { position: fixed; right: 2vw; bottom: 2vh; color: #999; font-size: 14px; }
+</style>
+</head>
+<body>
+  <div class="slide active">
+    <h1 class="animate-in">Endoscopic Spine Surgery Today</h1>
+    <p class="animate-in">A typical HTML deck an AI writes without any contract</p>
+    <div class="notes" style="display:none">This deck knows nothing about DeckWright. It runs on its own keyboard navigation and an .active class.</div>
+  </div>
+  <div class="slide">
+    <h2 class="animate-in">Key numbers (sample)</h2>
+    <div class="grid animate-in">
+      <div class="box"><b>2.1 d</b>Mean length of stay</div>
+      <div class="box"><b>87%</b>Satisfaction</div>
+      <div class="box"><b>3.2%</b>Reoperation rate</div>
+    </div>
+  </div>
+  <div class="slide">
+    <h2>Reveal in order</h2>
+    <p class="fragment">First, indications</p>
+    <p class="fragment">Second, technique</p>
+    <p class="fragment">Third, managing complications</p>
+  </div>
+  <div class="slide">
+    <h1 class="animate-in">Thank you</h1>
+  </div>
+  <div class="progress"></div>
+  <div class="nav-hint">← → to navigate</div>
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+  function showSlide(n) {
+    slides[current].classList.remove('active');
+    current = (n + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    document.querySelector('.progress').style.width = ((current + 1) / slides.length * 100) + '%';
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ') showSlide(current + 1);
+    if (e.key === 'ArrowLeft') showSlide(current - 1);
+  });
+  showSlide(0);
+</script>
+</body>
+</html>

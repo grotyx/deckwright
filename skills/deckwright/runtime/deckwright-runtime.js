@@ -1,0 +1,1580 @@
+/*! DeckWright runtime v0.1.0 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+ *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
+ *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
+ */
+(function () {
+  'use strict';
+  if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
+
+  var PRODUCT = 'DeckWright';
+  var VERSION = '0.1.0';
+  var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
+  var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
+
+  // UI language: data-hdek-lang="ko|en" > ?hdek-lang= > browser language
+  var LANG = (function () {
+    try {
+      var a = document.documentElement.getAttribute('data-hdek-lang');
+      var q = /[?&]hdek-lang=(ko|en)\b/.exec(location.search);
+      var v = a || (q && q[1]) || ((navigator.language || '').toLowerCase().indexOf('ko') === 0 ? 'ko' : 'en');
+      return v === 'ko' ? 'ko' : 'en';
+    } catch (e) { return 'en'; }
+  })();
+  function T(ko, en) { return LANG === 'ko' ? ko : en; }
+
+  // ------------------------------------------------------------------ utils
+  function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+  function $$(sel, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(sel)); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function store(key, val) {
+    try {
+      if (val === undefined) return window.localStorage.getItem(key);
+      window.localStorage.setItem(key, val);
+    } catch (e) { return null; }
+  }
+  function fmtTime(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    var mm = (h ? String(m).padStart(2, '0') : String(m)), ss = String(s).padStart(2, '0');
+    return (h ? h + ':' : '') + mm + ':' + ss;
+  }
+  function textOf(el) { return el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : ''; }
+  function topLevel(els) {
+    return els.filter(function (el) {
+      return !els.some(function (o) { return o !== el && o.contains(el); });
+    });
+  }
+  function isTyping(t) {
+    if (!t || !t.closest) return false;
+    return !!t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
+  }
+
+  // ------------------------------------------------------------------ CSS
+  var CSS = [
+    'html.hdek-on:not(.hdek-printing):not(.hdek-own) .hdek-slide:not(.hdek-current){display:none!important}',
+    'html.hdek-autostage, html.hdek-autostage body{overflow:hidden!important}',
+    '.hdek-backdrop{position:fixed;inset:0;background:#000;z-index:2147481000}',
+    'html.hdek-autostage:not(.hdek-printing) .hdek-slide.hdek-current{box-sizing:border-box!important;position:fixed!important;left:0!important;top:0!important;right:auto!important;bottom:auto!important;margin:0!important;transform-origin:0 0!important;zoom:1!important;z-index:2147481500!important;box-shadow:none!important;max-width:none!important;max-height:none!important}',
+    'html.hdek-on aside.notes, html.hdek-on [data-notes], html.hdek-on .hdek-notes-src, html.hdek-on .speaker-notes{display:none!important}',
+    'html.hdek-staged, html.hdek-staged body{margin:0!important;padding:0!important;width:100%;height:100%;overflow:hidden!important;background:#000}',
+    '.hdek-stage{position:fixed!important;left:0;top:0;transform-origin:0 0;overflow:hidden}',
+    ':where(.hdek-stage) > :where(.hdek-slide){position:absolute;inset:0;box-sizing:border-box}',
+    ':where(html.hdek-on) :where(.hdek-step){transition:opacity .45s ease, transform .55s cubic-bezier(.2,.7,.2,1), filter .45s ease}',
+    ':where(html.hdek-on) :where(.hdek-step:not(.is-on)){opacity:0;pointer-events:none}',
+    ':where(html.hdek-on) :where(.hdek-step[data-effect="rise"]:not(.is-on)){transform:translateY(28px)}',
+    ':where(html.hdek-on) :where(.hdek-step[data-effect="drop"]:not(.is-on)){transform:translateY(-28px)}',
+    ':where(html.hdek-on) :where(.hdek-step[data-effect="left"]:not(.is-on)){transform:translateX(-48px)}',
+    ':where(html.hdek-on) :where(.hdek-step[data-effect="right"]:not(.is-on)){transform:translateX(48px)}',
+    ':where(html.hdek-on) :where(.hdek-step[data-effect="zoom"]:not(.is-on)){transform:scale(.9)}',
+    ':where(html.hdek-on) :where(.hdek-step[data-effect="blur"]:not(.is-on)){filter:blur(10px)}',
+    ':where(html.hdek-on) :where(.hdek-step[data-effect="none"]){transition:none}',
+    ':where(html.hdek-on) :where(.hdek-step[data-effect="dim"]:not(.is-on)){opacity:.25;pointer-events:auto}',
+    ':where(html.hdek-on) :where(.hdek-step.hdek-step-out){opacity:0;pointer-events:none}',
+    'html.hdek-snap .hdek-current, html.hdek-snap .hdek-current *{transition:none!important}',
+    'html.hdek-preview, html.hdek-preview *{cursor:none!important;caret-color:transparent}',
+    'html.hdek-preview body{pointer-events:none!important}',
+    'html.hdek-idle, html.hdek-idle *{cursor:none!important}',
+    // ink + UI
+    '.hdek-ink{position:absolute;left:0;top:0;width:100%;height:100%;z-index:2147483000;pointer-events:none;touch-action:none}',
+    '.hdek-ink.hdek-fixed{position:fixed}',
+    '.hdek-ink.hdek-active{pointer-events:auto;cursor:crosshair}',
+    '.hdek-blank{position:fixed;inset:0;z-index:2147483200;display:none}',
+    '.hdek-blank.on{display:block}',
+    '.hdek-ui{position:fixed;z-index:2147483300;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;color:#fff}',
+    '.hdek-bar{left:16px;bottom:16px;display:flex;gap:4px;align-items:center;padding:6px;border-radius:12px;background:rgba(20,20,24,.82);backdrop-filter:blur(8px);box-shadow:0 6px 24px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:opacity .25s, transform .25s;pointer-events:none}',
+    '.hdek-bar.show{opacity:1;transform:none;pointer-events:auto}',
+    '.hdek-bar button{all:unset;box-sizing:border-box;width:34px;height:34px;border-radius:8px;display:grid;place-items:center;cursor:pointer;color:#e8e8ea}',
+    '.hdek-bar button:hover{background:rgba(255,255,255,.12)}',
+    '.hdek-bar button.on{background:#0a84ff;color:#fff}',
+    '.hdek-bar button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.hdek-bar .sep{width:1px;height:22px;background:rgba(255,255,255,.18);margin:0 4px}',
+    '.hdek-bar .sw{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.55)}',
+    '.hdek-bar button.swb.on{background:rgba(255,255,255,.18)}',
+    '.hdek-bar .num{min-width:52px;text-align:center;font-variant-numeric:tabular-nums;color:#c9c9cf;font-size:13px}',
+    '.hdek-toast{left:50%;bottom:28px;transform:translateX(-50%);padding:10px 16px;border-radius:10px;background:rgba(20,20,24,.92);max-width:80vw;opacity:0;transition:opacity .25s;pointer-events:none}',
+    '.hdek-toast.show{opacity:1}',
+    '.hdek-goto{right:24px;bottom:24px;padding:8px 14px;border-radius:10px;background:rgba(20,20,24,.92);font-size:20px;display:none}',
+    '.hdek-help{inset:0;background:rgba(0,0,0,.72);display:none;place-items:center}',
+    '.hdek-help.on{display:grid}',
+    '.hdek-help .card{background:#18181c;border-radius:16px;padding:24px 28px;min-width:420px;max-width:86vw;box-shadow:0 20px 60px rgba(0,0,0,.5)}',
+    '.hdek-help h3{margin:0 0 12px;font-size:17px}',
+    '.hdek-help table{border-collapse:collapse;font-size:14px}',
+    '.hdek-help td{padding:4px 18px 4px 0;vertical-align:top}',
+    '.hdek-help kbd{display:inline-block;padding:1px 7px;margin:1px 2px;border-radius:5px;background:#2c2c32;border:1px solid #3a3a42;font:12px ui-monospace,Menlo,Consolas,monospace}',
+    '@media print{.hdek-ui,.hdek-blank{display:none!important}}'
+  ].join('\n');
+
+  function injectCSS(doc, css, id) {
+    var s = doc.createElement('style');
+    if (id) s.id = id;
+    s.textContent = css;
+    (doc.head || doc.documentElement).appendChild(s);
+    return s;
+  }
+
+  // ------------------------------------------------------------------ icons
+  var ICON = {
+    prev: '<path d="M15 18l-6-6 6-6"/>',
+    next: '<path d="M9 18l6-6-6-6"/>',
+    pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>',
+    hl: '<path d="M9 11l-6 6v3h9l3-3"/><path d="M22 12l-4.6 4.6a2 2 0 01-2.8 0l-5.2-5.2a2 2 0 010-2.8L14 4"/>',
+    laser: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
+    eraser: '<path d="M7 21h10"/><path d="M5.5 14.5l7-7a2 2 0 012.8 0l3.2 3.2a2 2 0 010 2.8L13 19H8.5l-3-3a1.1 1.1 0 010-1.5z"/>',
+    clear: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/>',
+    blank: '<rect x="3" y="5" width="18" height="14" rx="2" fill="currentColor"/>',
+    presenter: '<rect x="2" y="4" width="13" height="10" rx="1.5"/><path d="M18 8h4M18 12h4M18 16h4M6 20h5M8.5 14v6"/>',
+    full: '<path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.7-2.5 2-2.5 3.5"/><path d="M12 17h.01"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'
+  };
+  function svg(name) { return '<svg viewBox="0 0 24 24">' + ICON[name] + '</svg>'; }
+
+  var COLORS = ['#ff3b30', '#ffd60a', '#0a84ff', '#30d158', '#ffffff', '#111111'];
+
+  // ------------------------------------------------------------------ state
+  var D = {
+    mode: 'contract',        // contract | heuristic | reveal | single
+    staged: false,
+    width: 1920, height: 1080,
+    root: null,
+    title: document.title || PRODUCT,
+    slides: [],              // {el,id,title,notesHTML,steps:[{el,at,out}],max,hook,autoplay}
+    state: { slide: 0, step: 0 },
+    blank: null,
+    tool: null,              // pen | hl | laser | eraser
+    color: COLORS[0],
+    ink: {},                 // slideId -> [stroke]
+    clickAdvance: true,
+    wheelAdvance: true,
+    duration: 0,
+    presenter: null,
+    adapter: null,
+    listeners: [],
+    ready: false
+  };
+  var pendingHooks = {};
+
+  // ------------------------------------------------------------------ detection
+  var HEURISTIC_SELECTORS = [
+    'section.slide', '.slide', '.scene', '.slides > section', '.stage > section', '.deck > section', '.deck > .page',
+    'main > section', 'body > section', 'article.slide', '.page.slide', '.swiper-slide'
+  ];
+
+  // If all slides share one fixed size that differs from the viewport, scale the current slide to fit
+  function fixedSize(els) {
+    var sample = els.slice(0, 6), w = 0, h = 0;
+    for (var i = 0; i < sample.length; i++) {
+      var cs = getComputedStyle(sample[i]);
+      var sw = parseFloat(cs.width), sh = parseFloat(cs.height);
+      if (cs.boxSizing !== 'border-box') {
+        // Fit by outer size (padding and border included) so it lands exactly on screen
+        sw += (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + (parseFloat(cs.borderLeftWidth) || 0) + (parseFloat(cs.borderRightWidth) || 0);
+        sh += (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+      }
+      if (!(sw >= 320 && sh >= 180)) return null;
+      if (i === 0) { w = sw; h = sh; }
+      else if (Math.abs(sw - w) > 1 || Math.abs(sh - h) > 1) return null;
+    }
+    if (Math.abs(w - window.innerWidth) <= 2 && Math.abs(h - window.innerHeight) <= 2) {
+      // If it equals the viewport, check the authored CSS to tell fixed sizes from vw/vh/% responsive slides
+      var a = authoredSize(els[0]);
+      if (!a.w || /vw|vh|%|vmin|vmax|calc|auto/.test(a.w + a.h)) return null;
+    }
+    var ratio = w / h;
+    if (ratio < 1 || ratio > 2.5) return null;
+    return { w: Math.round(w), h: Math.round(h) };
+  }
+
+  function authoredSize(el) {
+    var w = el.style.width || '', h = el.style.height || '';
+    try {
+      Array.prototype.forEach.call(document.styleSheets, function (sh) {
+        var rules; try { rules = sh.cssRules; } catch (e) { return; }
+        Array.prototype.forEach.call(rules || [], function (r) {
+          if (!r.selectorText || !r.style) return;
+          var m = false; try { m = el.matches(r.selectorText); } catch (e) { }
+          if (!m) return;
+          if (r.style.width && !el.style.width) w = r.style.width;
+          if (r.style.height && !el.style.height) h = r.style.height;
+        });
+      });
+    } catch (e) { }
+    return { w: w, h: h };
+  }
+
+  // ------------------------------------------------------------------ driver: decks with their own navigation engine
+  // When the deck handles keyboard navigation and step animation itself, leave its engine in charge and steer it with key events.
+  var KEYCODES = { ArrowRight: 39, ArrowLeft: 37, ArrowDown: 40, ArrowUp: 38, Home: 36, End: 35, PageDown: 34, PageUp: 33, ' ': 32, Enter: 13 };
+  var Driver = {
+    activeClass: null,
+    maxes: [],
+    observer: null,
+    syncing: false,
+    detect: function (els) {
+      if (els.length < 2) return null;
+      var code = $$('script:not([src]):not([data-hdek-runtime])').map(function (s) { return s.textContent || ''; }).join('\n');
+      if (!/ArrowRight|keyCode\s*===?\s*39|which\s*===?\s*39/.test(code)) return null;
+      var names = ['active', 'current', 'cur', 'present', 'is-active', 'show', 'visible', 'on', 'selected'];
+      var found = null;
+      for (var i = 0; i < names.length && !found; i++) {
+        var n = names[i], c = 0;
+        els.forEach(function (e) { if (e.classList.contains(n)) c++; });
+        if (c === 1) found = n;
+      }
+      if (!found) return null;
+      // If there are hidden step elements the deck's scripts never touch (e.g. an engine unaware of .fragment), take over
+      var kinds = [['[data-s]', /data-s\b|dataset\.s\b/], ['[data-step]', /data-step|dataset\.step/], ['.fragment', /fragment/], ['.step', /['".]step\b/]];
+      for (var k = 0; k < kinds.length; k++) {
+        var hidden = els.some(function (e) { return $$(kinds[k][0], e).some(isHiddenNow); });
+        if (hidden && !kinds[k][1].test(code)) return null;
+      }
+      return found;
+    },
+    init: function () {
+      var self = this;
+      this.maxes = D.slides.map(function (s) { return self.stepsOf(s.el).reduce(function (m, e, i) { return Math.max(m, self.rank(e, i)); }, 0); });
+      D.slides.forEach(function (s, i) { s.max = self.maxes[i]; });
+      var host = D.slides[0].el.parentElement || document.body;
+      try {
+        this.observer = new MutationObserver(function () {
+          if (self.syncing) return;
+          self.syncing = true;
+          requestAnimationFrame(function () { self.syncing = false; self.sync(); });
+        });
+        this.observer.observe(host, { attributes: true, attributeFilter: ['class'], subtree: true });
+      } catch (e) { }
+      // The slide's untransformed size is the stage size
+      var el = D.slides[0].el;
+      if (el.offsetWidth >= 320 && el.offsetHeight >= 180) { D.width = el.offsetWidth; D.height = el.offsetHeight; }
+      D.state = this.read();
+    },
+    stepsOf: function (el) { return $$('[data-s], [data-step], .fragment', el); },
+    rank: function (e, i) {
+      var v = e.getAttribute('data-s');
+      if (v === null) v = e.getAttribute('data-step');
+      if (v === null && e.hasAttribute('data-fragment-index')) v = String(+e.getAttribute('data-fragment-index') + 1);
+      var n = parseInt(v, 10);
+      return n >= 0 ? n : i + 1;
+    },
+    isOn: function (e) { var c = e.classList; return c.contains('on') || c.contains('is-on') || c.contains('visible') || c.contains('shown') || c.contains('revealed'); },
+    read: function () {
+      var idx = -1, ac = this.activeClass;
+      for (var i = 0; i < D.slides.length; i++) { if (D.slides[i].el.classList.contains(ac)) { idx = i; break; } }
+      if (idx < 0) return { slide: D.state.slide < 0 ? 0 : D.state.slide, step: D.state.step };
+      var self = this, step = 0;
+      this.stepsOf(D.slides[idx].el).forEach(function (e, i) { if (self.isOn(e)) step = Math.max(step, self.rank(e, i)); });
+      return { slide: idx, step: step };
+    },
+    sync: function () {
+      var s = this.read();
+      D.slides.forEach(function (x, i) { x.el.classList.toggle('hdek-current', i === s.slide); });
+      if (s.slide !== D.state.slide || s.step !== D.state.step) { D.state = s; afterChange(true); }
+      else { fit(); renderInk(); }
+    },
+    key: function (k) {
+      var target = document.body || document.documentElement;
+      ['keydown', 'keyup'].forEach(function (type) {
+        var ev;
+        try { ev = new KeyboardEvent(type, { key: k, code: k === ' ' ? 'Space' : k, bubbles: true, cancelable: true }); } catch (e) { return; }
+        try {
+          Object.defineProperty(ev, 'keyCode', { get: function () { return KEYCODES[k] || 0; } });
+          Object.defineProperty(ev, 'which', { get: function () { return KEYCODES[k] || 0; } });
+        } catch (e) { }
+        ev.__hdek = true;
+        target.dispatchEvent(ev);
+      });
+    },
+    count: function () { return D.slides.length; },
+    max: function (i) { return this.maxes[i] || 0; },
+    next: function () { this.key('ArrowRight'); this.sync(); },
+    prev: function () { this.key('ArrowLeft'); this.sync(); },
+    apply: function (prev, target, animate) {
+      var cur = this.read(), self = this, guard = 0, c, n;
+      var mx = this.max(cur.slide);
+      if (cur.slide === target.slide && target.step === cur.step) { /* already there */ }
+      else if (animate && cur.slide === target.slide && target.step === cur.step + 1) this.key('ArrowRight');
+      else if (animate && target.slide === cur.slide + 1 && target.step === 0 && cur.step >= mx) this.key('ArrowRight');
+      else if (cur.slide === target.slide && target.step === cur.step - 1) this.key('ArrowLeft');
+      else {
+        var done = false;
+        if (typeof window.__show === 'function') {
+          // Use the deck's own "go to final state of slide n" function if it has one
+          try { window.__show(target.slide + 1); } catch (e) { }
+          c = this.read();
+          while (c.slide === target.slide && c.step > target.step && guard++ < 200) { this.key('ArrowLeft'); c = this.read(); }
+          done = c.slide === target.slide && c.step === target.step;
+        }
+        if (!done) {
+          this.key('Home'); c = this.read(); guard = 0;
+          while ((c.slide > 0 || c.step > 0) && guard++ < 3000) { this.key('ArrowLeft'); n = this.read(); if (n.slide === c.slide && n.step === c.step) break; c = n; }
+          guard = 0;
+          while ((c.slide < target.slide || (c.slide === target.slide && c.step < target.step)) && guard++ < 3000) {
+            this.key('ArrowRight'); n = this.read(); if (n.slide === c.slide && n.step === c.step) break; c = n;
+          }
+        }
+      }
+      var now = this.read();
+      if (!animate && D.slides[now.slide]) finishAnimations(D.slides[now.slide].el);
+      D.state = now;
+    }
+  };
+
+  function collectNotesMap() {
+    var map = {};
+    var j = document.getElementById('hdek-notes');
+    if (j) { try { map = JSON.parse(j.textContent || '{}'); } catch (e) { } }
+    return map;
+  }
+
+  var NOTES_SEL = 'aside.notes, aside.note, [data-notes], .notes, .speaker-notes';
+  function guessTitle(el, i) {
+    var h = el.querySelector('h1, h2, h3');
+    var t = textOf(h);
+    if (!t) {
+      var cands = $$('[class*="title"], [class*="head"] h4, h4, [class*="chip"], [class*="kicker"], [class*="eyebrow"], strong, b', el);
+      for (var k = 0; k < cands.length && !t; k++) {
+        if (cands[k].closest(NOTES_SEL)) continue;
+        var s = textOf(cands[k]);
+        if (s && s.length >= 2 && s.length <= 90) t = s;
+      }
+    }
+    if (!t) {
+      // Without a heading, take the shortest line with the largest font as the title
+      var best = null, bestSize = 0, n = 0;
+      $$('p, span, div, td, li', el).some(function (c) {
+        if (c.closest(NOTES_SEL) || c.children.length > 3) return false;
+        var s = textOf(c);
+        if (!s || s.length < 2 || s.length > 90) return false;
+        if (++n > 60) return true;
+        var fs = parseFloat(getComputedStyle(c).fontSize) || 0;
+        if (fs > bestSize + 0.5) { bestSize = fs; best = s; }
+        return false;
+      });
+      t = best;
+    }
+    return t || (T('슬라이드 ', 'Slide ') + (i + 1));
+  }
+
+  function isHiddenNow(s) {
+    try {
+      var cs = getComputedStyle(s);
+      return cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.1;
+    } catch (e) { return false; }
+  }
+
+  function buildSlide(el, i, notesMap, heuristic) {
+    var id = el.getAttribute('data-slide') || el.id || ('s' + (i + 1));
+    var title = el.getAttribute('data-title') || guessTitle(el, i);
+    if (title.length > 80) title = title.slice(0, 78) + '…';
+    var notesEl = el.querySelector(heuristic ? NOTES_SEL : 'aside.notes, [data-notes]');
+    if (!notesEl && heuristic) {
+      // Notes placed right after a slide (<section class="slide">…</section><aside class="notes">…)
+      var sib = el.nextElementSibling;
+      if (sib && sib.matches && sib.matches(NOTES_SEL) && !sib.matches('section.slide, .slide, .scene')) notesEl = sib;
+    }
+    if (notesEl && heuristic && D.mode !== 'driver') notesEl.classList.add('hdek-notes-src');
+    var notesHTML = notesEl ? notesEl.innerHTML.trim() : '';
+    if (!notesHTML && notesMap[id]) notesHTML = String(notesMap[id]).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; });
+    var sel = heuristic ? '[data-step], .step, .fragment, .reveal-step' : '[data-step]';
+    var stepEls = D.mode === 'driver' ? [] : $$(sel, el).filter(function (s) {
+      var owner = s.parentElement && s.parentElement.closest('.hdek-slide');
+      if (!(owner === el || !owner)) return false;
+      // Heuristic: .step/.fragment visible from the start is decoration, not a step
+      if (heuristic && !s.hasAttribute('data-step') && !isHiddenNow(s)) return false;
+      return true;
+    });
+    var counter = 0, steps = [];
+    stepEls.forEach(function (s) {
+      var raw = s.getAttribute('data-step');
+      if (raw === null && s.hasAttribute('data-fragment-index')) raw = String(+s.getAttribute('data-fragment-index') + 1);
+      var n = parseInt(raw, 10);
+      if (!(n > 0)) n = counter + 1;
+      counter = Math.max(counter, n);
+      var out = parseInt(s.getAttribute('data-step-out'), 10);
+      s.classList.add('hdek-step');
+      steps.push({ el: s, at: n, out: out > 0 ? out : 0 });
+      if (out > counter) counter = out;
+    });
+    var declared = parseInt(el.getAttribute('data-steps'), 10) || 0;
+    var slide = {
+      el: el, id: id, title: title, notesHTML: notesHTML, steps: steps,
+      max: Math.max(counter, declared), hook: null,
+      autoplay: parseInt(el.getAttribute('data-autoplay'), 10) || 0
+    };
+    el.classList.add('hdek-slide');
+    el.setAttribute('data-hdek-index', i + 1);
+    return slide;
+  }
+
+  function detect() {
+    var notesMap = collectNotesMap();
+    var root = $('[data-hdek]');
+    var els = $$('[data-slide]');
+    var heuristic = false;
+    if (!els.length && root) els = Array.prototype.slice.call(root.children).filter(function (c) { return c.tagName === 'SECTION'; });
+    if (!els.length) {
+      heuristic = true;
+      for (var i = 0; i < HEURISTIC_SELECTORS.length; i++) {
+        var cand = topLevel($$(HEURISTIC_SELECTORS[i])).filter(function (e) { return !e.closest('aside.notes'); });
+        if (cand.length >= 2) { els = cand; break; }
+      }
+    }
+    els = topLevel(els);
+    if (!els.length) { D.mode = 'single'; els = [document.body]; heuristic = true; }
+    else D.mode = heuristic ? 'heuristic' : 'contract';
+    if (D.mode === 'heuristic' && ROLE !== 'printonly') {
+      var ac = Driver.detect(els);
+      if (ac) { D.mode = 'driver'; Driver.activeClass = ac; }
+    }
+    D.root = root || (els[0] !== document.body ? els[0].parentElement : null);
+    D.slides = els.map(function (el, i) { return buildSlide(el, i, notesMap, heuristic); });
+    var r = D.root || document.documentElement;
+    D.width = parseInt(r.getAttribute('data-width'), 10) || 1920;
+    D.height = parseInt(r.getAttribute('data-height'), 10) || 1080;
+    D.staged = !!(root && root.getAttribute('data-fit') !== 'none' && D.mode === 'contract');
+    if (D.mode === 'driver') Driver.init();
+    else if (D.mode === 'heuristic') {
+      var sz = fixedSize(els);
+      if (sz) { D.autostage = true; D.width = sz.w; D.height = sz.h; }
+    }
+    D.title = r.getAttribute('data-title') || document.title || PRODUCT;
+    D.clickAdvance = r.getAttribute('data-click') !== 'off';
+    D.wheelAdvance = r.getAttribute('data-wheel') !== 'off';
+    D.duration = parseFloat(r.getAttribute('data-duration')) || 0;
+    // hooks registered early
+    var early = window.hdekHooks || {};
+    Object.keys(early).forEach(function (k) { pendingHooks[k] = early[k]; });
+    D.slides.forEach(function (s) { attachHook(s, pendingHooks[s.id]); });
+  }
+
+  function attachHook(slide, hook) {
+    if (!slide || !hook) return;
+    slide.hook = hook;
+    slide.max = Math.max(slide.max, parseInt(hook.steps, 10) || 0);
+  }
+
+  // ------------------------------------------------------------------ native adapter
+  var Native = {
+    count: function () { return D.slides.length; },
+    max: function (i) { return D.slides[i] ? D.slides[i].max : 0; },
+    apply: function (prev, next, animate) {
+      var s = D.slides[next.slide];
+      if (!s) return;
+      var changed = prev.slide !== next.slide;
+      if (!animate) document.documentElement.classList.add('hdek-snap');
+      if (changed) {
+        var old = D.slides[prev.slide];
+        if (old) {
+          old.el.classList.remove('hdek-current', 'active', 'is-active', 'current', 'present');
+          emit(old.el, 'hdek:leave', { index: prev.slide });
+          pauseMedia(old.el);
+        }
+        s.el.classList.add('hdek-current', 'active', 'is-active', 'current', 'present');
+        if (D.mode !== 'single') window.scrollTo(0, 0);
+      }
+      setSteps(s, next.step, animate);
+      if (changed) emit(s.el, 'hdek:enter', { index: next.slide, step: next.step, animate: animate });
+      if (!animate) {
+        void s.el.offsetWidth;
+        finishAnimations(s.el);
+        requestAnimationFrame(function () { document.documentElement.classList.remove('hdek-snap'); });
+      }
+    }
+  };
+
+  function setSteps(s, step, animate) {
+    s.steps.forEach(function (it) {
+      var on = step >= it.at;
+      var out = it.out && step >= it.out;
+      it.el.classList.toggle('is-on', on && !out);
+      it.el.classList.toggle('visible', on && !out);
+      it.el.classList.toggle('hdek-step-out', !!out);
+      it.el.classList.toggle('current-step', on && !out && it.at === step);
+    });
+    if (s.hook && typeof s.hook.setStep === 'function') {
+      try { s.hook.setStep(step, { animate: animate, slide: s.el, max: s.max }); } catch (e) { console.warn('[hdek] hook error', e); }
+    }
+    emit(s.el, 'hdek:step', { step: step, max: s.max, animate: animate });
+  }
+
+  function finishAnimations(el) {
+    if (!el.getAnimations) return;
+    try {
+      el.getAnimations({ subtree: true }).forEach(function (a) {
+        try {
+          var t = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+          if (t && isFinite(t.endTime)) a.finish();
+        } catch (e) { }
+      });
+    } catch (e) { }
+  }
+
+  function pauseMedia(el) {
+    $$('video, audio', el).forEach(function (m) { try { if (!m.hasAttribute('data-keep-playing')) m.pause(); } catch (e) { } });
+  }
+
+  function emit(el, type, detail) {
+    try { el.dispatchEvent(new CustomEvent(type, { detail: detail, bubbles: true })); } catch (e) { }
+  }
+
+  // ------------------------------------------------------------------ reveal.js adapter (experimental)
+  var RevealAdapter = {
+    list: [],
+    init: function () {
+      var R = window.Reveal;
+      this.list = R.getSlides();
+      D.slides = this.list.map(function (el, i) {
+        var frags = $$('.fragment', el), idx = {};
+        frags.forEach(function (f) { idx[f.getAttribute('data-fragment-index') || ('auto' + Math.random())] = 1; });
+        var h = el.querySelector('h1,h2,h3');
+        var notes = R.getSlideNotes ? (R.getSlideNotes(el) || '') : '';
+        if (!notes) { var a = el.querySelector('aside.notes'); notes = a ? a.innerHTML : ''; }
+        return { el: el, id: el.id || ('s' + (i + 1)), title: el.getAttribute('data-title') || textOf(h) || (T('슬라이드 ', 'Slide ') + (i + 1)), notesHTML: notes, steps: [], max: Object.keys(idx).length, hook: null, autoplay: 0 };
+      });
+      D.mode = 'reveal';
+      var sync = function () {
+        var cur = R.getCurrentSlide(), i = RevealAdapter.list.indexOf(cur);
+        var f = R.getIndices().f;
+        var st = { slide: Math.max(0, i), step: (typeof f === 'number' ? f + 1 : 0) };
+        if (st.slide !== D.state.slide || st.step !== D.state.step) { D.state = st; afterChange(true); }
+      };
+      ['slidechanged', 'fragmentshown', 'fragmenthidden'].forEach(function (ev) { R.on(ev, sync); });
+      sync();
+    },
+    count: function () { return D.slides.length; },
+    max: function (i) { return D.slides[i] ? D.slides[i].max : 0; },
+    apply: function (prev, next, animate) {
+      var R = window.Reveal, el = this.list[next.slide];
+      if (!el) return;
+      var ix = R.getIndices(el);
+      if (!animate) R.configure({ transition: 'none' });
+      R.slide(ix.h, ix.v, next.step - 1);
+      if (!animate && ROLE !== 'preview') setTimeout(function () { R.configure({ transition: RevealAdapter.transition || 'slide' }); }, 50);
+    }
+  };
+
+  // ------------------------------------------------------------------ navigation
+  function adapter() { return D.adapter || (D.mode === 'driver' ? Driver : Native); }
+
+  function go(slide, step, animate, fromSync) {
+    var A = adapter();
+    var n = A.count();
+    if (!n) return;
+    slide = clamp(slide, 0, n - 1);
+    step = clamp(step, 0, A.max(slide));
+    var prev = D.state;
+    if (prev.slide === slide && prev.step === step && D.ready) return;
+    var next = { slide: slide, step: step };
+    D.state = next;
+    A.apply(prev, next, animate !== false);
+    afterChange(!fromSync);
+  }
+
+  function next() {
+    if (D.mode === 'driver') { var b0 = D.state; Driver.next(); if (b0.slide === D.state.slide && b0.step === D.state.step && D.state.slide >= D.slides.length - 1) toast(T('마지막 슬라이드입니다', 'This is the last slide')); return; }
+    var A = adapter(), s = D.state;
+    if (s.step < A.max(s.slide)) go(s.slide, s.step + 1, true);
+    else if (s.slide < A.count() - 1) go(s.slide + 1, 0, true);
+    else toast(T('마지막 슬라이드입니다', 'This is the last slide'));
+  }
+  function prev() {
+    if (D.mode === 'driver') { Driver.prev(); return; }
+    var A = adapter(), s = D.state;
+    if (s.step > 0) go(s.slide, s.step - 1, false);
+    else if (s.slide > 0) go(s.slide - 1, A.max(s.slide - 1), false);
+  }
+
+  var autoTimer = null;
+  function afterChange(local) {
+    clearTimeout(autoTimer);
+    var s = D.slides[D.state.slide];
+    if (ROLE === 'audience' && s && s.autoplay && D.state.step < s.max) {
+      autoTimer = setTimeout(function () { if (D.state.slide === D.slides.indexOf(s)) next(); }, s.autoplay);
+    }
+    if (ROLE === 'audience' && D.mode !== 'driver') {
+      try { history.replaceState(null, '', '#' + (D.state.slide + 1) + (D.state.step ? '.' + D.state.step : '')); } catch (e) { }
+      store('hdek-pos:' + deckKey(), JSON.stringify(D.state));
+    }
+    fit();
+    renderInk();
+    updateBar();
+    Presenter.update();
+    D.listeners.forEach(function (fn) { try { fn(D.state); } catch (e) { } });
+    try { window.dispatchEvent(new CustomEvent('hdek:change', { detail: { slide: D.state.slide, step: D.state.step } })); } catch (e) { }
+  }
+
+  function deckKey() { return (D.title + '|' + D.slides.length + '|' + location.pathname).slice(0, 200); }
+
+  function parseHash() {
+    var m = /^#(\d+)(?:\.(\d+))?$/.exec(location.hash || '');
+    return m ? { slide: +m[1] - 1, step: +(m[2] || 0) } : null;
+  }
+
+  // ------------------------------------------------------------------ stage fit
+  function fit() {
+    var W = D.width, H = D.height, vw = window.innerWidth, vh = window.innerHeight;
+    var s = Math.min(vw / W, vh / H);
+    var tf = 'translate(' + ((vw - W * s) / 2) + 'px,' + ((vh - H * s) / 2) + 'px) scale(' + s + ')';
+    if (D.staged && D.root) {
+      D.root.style.width = W + 'px';
+      D.root.style.height = H + 'px';
+      D.root.style.transform = tf;
+    } else if (D.autostage && !document.documentElement.classList.contains('hdek-printing')) {
+      D.slides.forEach(function (x, i) {
+        if (i === D.state.slide) {
+          x.el.style.setProperty('width', W + 'px', 'important');
+          x.el.style.setProperty('height', H + 'px', 'important');
+          x.el.style.setProperty('transform', tf, 'important');
+        } else if (x.el.style.transform) { x.el.style.removeProperty('transform'); x.el.style.removeProperty('width'); x.el.style.removeProperty('height'); }
+      });
+    }
+    positionInk();
+  }
+
+  // Lay the ink canvas exactly over the current slide (stage)
+  function inkBox() {
+    var el = D.staged ? D.root : (D.slides[D.state.slide] && D.slides[D.state.slide].el);
+    var r = el && el !== document.body ? el.getBoundingClientRect() : null;
+    if (!r || r.width < 50 || r.height < 50 || D.mode === 'single') r = { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+    return r;
+  }
+  function positionInk() {
+    if (!inkCanvas) return;
+    var r = inkBox();
+    var st = inkCanvas.style;
+    st.left = r.left + 'px'; st.top = r.top + 'px'; st.width = r.width + 'px'; st.height = r.height + 'px';
+    renderInk();
+  }
+
+  // ------------------------------------------------------------------ ink
+  var inkCanvas = null, laser = null, drawing = null, laserTrail = [];
+
+  function Ink(canvas, boxFn) { this.c = canvas; this.box = boxFn; }
+  Ink.prototype.size = function () {
+    var b = this.box(), dpr = Math.min(2, (window.devicePixelRatio || 1) * (b.scale || 1));
+    var w = Math.max(1, Math.round(b.w * dpr)), h = Math.max(1, Math.round(b.h * dpr));
+    if (this.c.width !== w || this.c.height !== h) { this.c.width = w; this.c.height = h; }
+    return { w: w, h: h };
+  };
+  Ink.prototype.render = function (strokes, extra, laserPt, trail) {
+    var sz = this.size(), ctx = this.c.getContext('2d');
+    ctx.clearRect(0, 0, sz.w, sz.h);
+    var all = (strokes || []).concat(extra ? [extra] : []);
+    all.forEach(function (st) { drawStroke(ctx, st, sz.w, sz.h); });
+    if (trail && trail.length) {
+      for (var i = 1; i < trail.length; i++) {
+        var a = trail[i - 1], b = trail[i], t = i / trail.length;
+        ctx.strokeStyle = 'rgba(255,40,40,' + (0.35 * t) + ')';
+        ctx.lineWidth = sz.h * 0.006 * t + 1; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(a[0] * sz.w, a[1] * sz.h); ctx.lineTo(b[0] * sz.w, b[1] * sz.h); ctx.stroke();
+      }
+    }
+    if (laserPt) {
+      var x = laserPt[0] * sz.w, y = laserPt[1] * sz.h, r = sz.h * 0.011;
+      var g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.6);
+      g.addColorStop(0, 'rgba(255,60,60,1)'); g.addColorStop(0.35, 'rgba(255,30,30,.85)'); g.addColorStop(1, 'rgba(255,0,0,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 2.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, r * 0.35, 0, Math.PI * 2); ctx.fill();
+    }
+  };
+
+  function drawStroke(ctx, st, w, h) {
+    var p = st.p; if (!p || !p.length) return;
+    var base = st.w * h;
+    ctx.save();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = st.c; ctx.fillStyle = st.c;
+    if (st.t === 'hl') { ctx.globalAlpha = 0.36; ctx.lineCap = 'butt'; }
+    if (p.length === 1) {
+      ctx.beginPath(); ctx.arc(p[0][0] * w, p[0][1] * h, base / 2, 0, Math.PI * 2); ctx.fill(); ctx.restore(); return;
+    }
+    if (st.t === 'hl') {
+      ctx.lineWidth = base; ctx.beginPath(); ctx.moveTo(p[0][0] * w, p[0][1] * h);
+      for (var k = 1; k < p.length; k++) ctx.lineTo(p[k][0] * w, p[k][1] * h);
+      ctx.stroke(); ctx.restore(); return;
+    }
+    for (var i = 1; i < p.length; i++) {
+      var a = p[i - 1], b = p[i], pr = ((a[2] || 0.5) + (b[2] || 0.5)) / 2;
+      ctx.lineWidth = Math.max(1, base * (0.55 + pr * 0.9));
+      ctx.beginPath();
+      if (i > 1) {
+        var z = p[i - 2];
+        ctx.moveTo((z[0] + a[0]) / 2 * w, (z[1] + a[1]) / 2 * h);
+        ctx.quadraticCurveTo(a[0] * w, a[1] * h, (a[0] + b[0]) / 2 * w, (a[1] + b[1]) / 2 * h);
+      } else {
+        ctx.moveTo(a[0] * w, a[1] * h); ctx.lineTo((a[0] + b[0]) / 2 * w, (a[1] + b[1]) / 2 * h);
+      }
+      ctx.stroke();
+    }
+    var l = p[p.length - 1], m = p[p.length - 2];
+    ctx.beginPath(); ctx.moveTo((m[0] + l[0]) / 2 * w, (m[1] + l[1]) / 2 * h); ctx.lineTo(l[0] * w, l[1] * h); ctx.stroke();
+    ctx.restore();
+  }
+
+  var inkAudience = null;
+  function setupInk() {
+    inkCanvas = document.createElement('canvas');
+    inkCanvas.className = 'hdek-ink hdek-ui-ink hdek-fixed';
+    document.body.appendChild(inkCanvas);
+    inkAudience = new Ink(inkCanvas, function () { var r = inkBox(); return { w: r.width, h: r.height, scale: 1 }; });
+    bindDraw(inkCanvas, window);
+    try { var saved = JSON.parse(store('hdek-ink:' + deckKey()) || 'null'); if (saved && typeof saved === 'object') D.ink = saved; } catch (e) { }
+  }
+
+  function resizeInk() { positionInk(); }
+
+  var rafPending = false;
+  function renderInk() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function () {
+      rafPending = false;
+      var s = D.slides[D.state.slide], strokes = s ? (D.ink[s.id] || []) : [];
+      var lp = laser && (Date.now() - laser.t < 2500) ? laser.p : null;
+      if (inkAudience) inkAudience.render(strokes, drawing, lp, laserTrail);
+      Presenter.renderInk(strokes, drawing, lp, laserTrail);
+      if (lp) renderInk();
+    });
+  }
+
+  function saveInk() { store('hdek-ink:' + deckKey(), JSON.stringify(D.ink)); }
+
+  function bindDraw(canvas, win) {
+    var down = false, tempPen = false;
+    function pt(e) {
+      var r = canvas.getBoundingClientRect();
+      var pr = e.pointerType === 'pen' ? (e.pressure || 0.5) : 0.5;
+      return [clamp((e.clientX - r.left) / r.width, 0, 1), clamp((e.clientY - r.top) / r.height, 0, 1), pr];
+    }
+    canvas.addEventListener('pointerdown', function (e) {
+      if (!D.tool) return;
+      e.preventDefault();
+      down = true;
+      try { canvas.setPointerCapture(e.pointerId); } catch (x) { }
+      var s = D.slides[D.state.slide]; if (!s) return;
+      if (D.tool === 'eraser') { erase(pt(e)); return; }
+      if (D.tool === 'laser') { moveLaser(pt(e)); return; }
+      drawing = { t: D.tool, c: D.tool === 'hl' ? (D.color === '#111111' ? '#ffd60a' : D.color) : D.color, w: D.tool === 'hl' ? 0.026 : 0.0042, p: [pt(e)] };
+      renderInk();
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      if (D.tool === 'laser') { moveLaser(pt(e)); return; }
+      if (!down) return;
+      if (D.tool === 'eraser') { erase(pt(e)); return; }
+      if (!drawing) return;
+      var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      if (!evs.length) evs = [e];
+      evs.forEach(function (ev) { drawing.p.push(pt(ev)); });
+      renderInk();
+    });
+    function end() {
+      if (!down) return;
+      down = false;
+      if (drawing) {
+        var s = D.slides[D.state.slide];
+        if (s && drawing.p.length) { (D.ink[s.id] = D.ink[s.id] || []).push(drawing); saveInk(); }
+        drawing = null;
+        renderInk();
+      }
+      if (tempPen) { tempPen = false; setTool(null); }
+    }
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+    canvas.addEventListener('pointerleave', function () { if (D.tool === 'laser') { laser = null; laserTrail = []; renderInk(); } });
+    // A stylus writes without picking a tool (as in Slidev)
+    var target = canvas.ownerDocument;
+    target.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'pen' && !D.tool && ROLE === 'audience') {
+        var r = canvas.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+          tempPen = true; setTool('pen');
+        }
+      }
+    }, true);
+  }
+
+  function moveLaser(p) {
+    laser = { p: p, t: Date.now() };
+    laserTrail.push([p[0], p[1]]);
+    if (laserTrail.length > 14) laserTrail.shift();
+    renderInk();
+  }
+
+  function erase(p) {
+    var s = D.slides[D.state.slide]; if (!s || !D.ink[s.id]) return;
+    var r = 0.02, before = D.ink[s.id].length;
+    D.ink[s.id] = D.ink[s.id].filter(function (st) {
+      return !st.p.some(function (q) { var dx = (q[0] - p[0]) * (16 / 9), dy = q[1] - p[1]; return dx * dx + dy * dy < r * r; });
+    });
+    if (D.ink[s.id].length !== before) { saveInk(); renderInk(); }
+  }
+
+  function clearInk(all) {
+    if (all) D.ink = {};
+    else { var s = D.slides[D.state.slide]; if (s) delete D.ink[s.id]; }
+    saveInk(); renderInk();
+    toast(all ? T('모든 필기를 지웠습니다', 'Cleared all ink') : T('이 슬라이드의 필기를 지웠습니다', 'Cleared ink on this slide'));
+  }
+
+  function setTool(t) {
+    D.tool = (D.tool === t) ? null : t;
+    if (t === null) D.tool = null;
+    if (D.tool !== 'laser') { laser = null; laserTrail = []; }
+    if (inkCanvas) inkCanvas.classList.toggle('hdek-active', !!D.tool);
+    Presenter.toolChanged();
+    updateBar();
+    renderInk();
+  }
+
+  // ------------------------------------------------------------------ blank
+  var blankEl = null;
+  function setBlank(kind) {
+    D.blank = (D.blank === kind) ? null : kind;
+    if (!blankEl) return;
+    blankEl.className = 'hdek-blank' + (D.blank ? ' on' : '');
+    blankEl.style.background = D.blank === 'white' ? '#fff' : '#000';
+    Presenter.update();
+  }
+
+  // ------------------------------------------------------------------ UI (audience)
+  var bar = null, toastEl = null, gotoEl = null, helpEl = null, idleTimer = null;
+  function setupUI() {
+    blankEl = document.createElement('div'); blankEl.className = 'hdek-blank'; document.body.appendChild(blankEl);
+    bar = document.createElement('div'); bar.className = 'hdek-ui hdek-bar';
+    var html = '' +
+      btn('prev', T('이전 (←)', 'Previous (←)')) + '<span class="num"></span>' + btn('next', T('다음 (→)', 'Next (→)')) +
+      '<span class="sep"></span>' +
+      btn('pen', T('펜 (D)', 'Pen (D)'), 'pen') + btn('hl', T('형광펜 (H)', 'Highlighter (H)'), 'hl') + btn('laser', T('레이저 (L)', 'Laser (L)'), 'laser') + btn('eraser', T('지우개 (E)', 'Eraser (E)'), 'eraser') +
+      COLORS.slice(0, 4).map(function (c) { return '<button class="swb" data-color="' + c + T('" title="색"><span class="sw" style="background:', '" title="Color"><span class="sw" style="background:') + c + '"></span></button>'; }).join('') +
+      btn('clear', T('이 슬라이드 필기 지우기 (C)', 'Clear ink on this slide (C)')) +
+      '<span class="sep"></span>' +
+      btn('blank', T('검은 화면 (B)', 'Black screen (B)')) + btn('presenter', T('발표자 창 (S)', 'Presenter view (S)')) + btn('full', T('전체화면 / 프로젝터 (F)', 'Fullscreen / projector (F)')) + btn('help', T('단축키 (?)', 'Shortcuts (?)'));
+    bar.innerHTML = html;
+    function btn(name, title, tool) { return '<button data-act="' + name + '"' + (tool ? ' data-tool="' + tool + '"' : '') + ' title="' + title + '">' + svg(name) + '</button>'; }
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      e.stopPropagation();
+      if (b.dataset.color) { D.color = b.dataset.color; if (!D.tool || D.tool === 'laser' || D.tool === 'eraser') setTool('pen'); else updateBar(); Presenter.toolChanged(); return; }
+      action(b.dataset.act);
+    });
+    document.body.appendChild(bar);
+    toastEl = document.createElement('div'); toastEl.className = 'hdek-ui hdek-toast'; document.body.appendChild(toastEl);
+    gotoEl = document.createElement('div'); gotoEl.className = 'hdek-ui hdek-goto'; document.body.appendChild(gotoEl);
+    helpEl = document.createElement('div'); helpEl.className = 'hdek-ui hdek-help'; helpEl.innerHTML = helpHTML(); document.body.appendChild(helpEl);
+    helpEl.addEventListener('click', function () { helpEl.classList.remove('on'); });
+    document.addEventListener('mousemove', function (e) {
+      document.documentElement.classList.remove('hdek-idle');
+      clearTimeout(idleTimer);
+      var nearBottom = e.clientY > window.innerHeight - 140 && e.clientX < 760;
+      bar.classList.toggle('show', nearBottom || bar.matches(':hover'));
+      idleTimer = setTimeout(function () { if (!D.tool && !bar.matches(':hover')) { document.documentElement.classList.add('hdek-idle'); bar.classList.remove('show'); } }, 2200);
+    });
+    updateBar();
+  }
+
+  function updateBar() {
+    if (!bar) return;
+    var A = adapter(), s = D.state;
+    var num = bar.querySelector('.num');
+    if (num) num.textContent = (s.slide + 1) + ' / ' + A.count();
+    $$('button[data-tool]', bar).forEach(function (b) { b.classList.toggle('on', b.dataset.tool === D.tool); });
+    $$('button[data-color]', bar).forEach(function (b) { b.classList.toggle('on', b.dataset.color === D.color); });
+  }
+
+  function helpHTML() {
+    var rows = [
+      [T('다음 / 이전', 'Next / previous'), T('<kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd> 클릭·휠 / <kbd>←</kbd><kbd>PgUp</kbd><kbd>P</kbd>', '<kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd> click · wheel / <kbd>←</kbd><kbd>PgUp</kbd><kbd>P</kbd>')],
+      [T('처음 / 끝 · 이동', 'First / last · go to'), T('<kbd>Home</kbd> <kbd>End</kbd> · 숫자 + <kbd>Enter</kbd>', '<kbd>Home</kbd> <kbd>End</kbd> · number + <kbd>Enter</kbd>')],
+      [T('발표자 창', 'Presenter view'), '<kbd>S</kbd>'],
+      [T('전체화면 · 프로젝터로', 'Fullscreen · to projector'), '<kbd>F</kbd>'],
+      [T('검은 / 흰 화면', 'Black / white screen'), '<kbd>B</kbd> <kbd>.</kbd> / <kbd>W</kbd>'],
+      [T('펜 · 형광펜 · 레이저 · 지우개', 'Pen · highlighter · laser · eraser'), T('<kbd>D</kbd> <kbd>H</kbd> <kbd>L</kbd> <kbd>E</kbd> (펜 태블릿은 바로 필기)', '<kbd>D</kbd> <kbd>H</kbd> <kbd>L</kbd> <kbd>E</kbd> (a stylus draws right away)')],
+      [T('필기 지우기 / 모두', 'Clear ink / all'), '<kbd>C</kbd> / <kbd>Shift</kbd>+<kbd>C</kbd>'],
+      [T('도구 끄기', 'Tool off'), '<kbd>Esc</kbd>'],
+      [T('인쇄 · PDF', 'Print · PDF'), T('<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd> (모든 단계가 펼쳐진 상태로)', '<kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>P</kbd> (every step revealed)')]
+    ];
+    return '<div class="card"><h3>' + PRODUCT + T(' 단축키</h3><table>', ' shortcuts</h3><table>') + rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('') + '</table></div>';
+  }
+
+  var toastTimer = null;
+  function toast(msg, ms) {
+    if (!toastEl || ROLE !== 'audience') return;
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, ms || 1800);
+  }
+
+  // ------------------------------------------------------------------ fullscreen / projector
+  function toggleFullscreen() {
+    var doc = document;
+    if (doc.fullscreenElement || doc.webkitFullscreenElement) {
+      (doc.exitFullscreen || doc.webkitExitFullscreen).call(doc);
+      return;
+    }
+    var el = doc.documentElement;
+    var req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req) { toast(T('이 브라우저는 전체화면을 지원하지 않습니다', 'This browser does not support fullscreen')); return; }
+    var plain = function () {
+      try { var r = req.call(el); if (r && r.catch) r.catch(function () { toast(T('한 번 더 F를 눌러 주세요', 'Press F once more')); }); } catch (e) { }
+    };
+    if (!('getScreenDetails' in window) || !(window.screen && window.screen.isExtended)) { plain(); return; }
+    window.getScreenDetails().then(function (sd) {
+      var cur = sd.currentScreen;
+      var target = sd.screens.filter(function (s) { return s !== cur; }).sort(function (a, b) { return (a.isInternal ? 1 : 0) - (b.isInternal ? 1 : 0); })[0];
+      if (!target) { plain(); return; }
+      var r = req.call(el, { screen: target });
+      if (r && r.catch) r.catch(plain);
+      toast(T('프로젝터 화면에 전체화면으로 표시합니다', 'Showing fullscreen on the projector'));
+    }).catch(plain);
+  }
+
+  // ------------------------------------------------------------------ input
+  var gotoBuf = '', gotoTimer = null;
+  function action(a, ev) {
+    switch (a) {
+      case 'next': next(); break;
+      case 'prev': prev(); break;
+      case 'first': go(0, 0, true); break;
+      case 'last': go(adapter().count() - 1, adapter().max(adapter().count() - 1), false); break;
+      case 'pen': setTool('pen'); break;
+      case 'hl': setTool('hl'); break;
+      case 'laser': setTool('laser'); break;
+      case 'eraser': setTool('eraser'); break;
+      case 'clear': clearInk(ev && ev.shiftKey); break;
+      case 'clearall': clearInk(true); break;
+      case 'blank': setBlank('black'); break;
+      case 'white': setBlank('white'); break;
+      case 'presenter': Presenter.open(); break;
+      case 'full': toggleFullscreen(); break;
+      case 'help': if (helpEl) helpEl.classList.toggle('on'); break;
+      case 'print': window.print(); break;
+    }
+  }
+
+  function keyAction(e) {
+    var k = e.key;
+    if (e.altKey || (e.ctrlKey && k !== 'F5') || e.metaKey) return null;
+    switch (k) {
+      case 'ArrowRight': case 'ArrowDown': case 'PageDown': case ' ': return 'next';
+      case 'n': case 'N': return D.mode === 'driver' ? null : 'next';
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp': case 'Backspace': return 'prev';
+      case 'p': case 'P': return D.mode === 'driver' ? null : 'prev';
+      case 'Home': return 'first';
+      case 'End': return 'last';
+      case 's': case 'S': return 'presenter';
+      case 'f': case 'F': case 'F5': return 'full';
+      case 'b': case 'B': case '.': return 'blank';
+      case 'w': case 'W': case ',': return 'white';
+      case 'd': case 'D': return 'pen';
+      case 'h': case 'H': return 'hl';
+      case 'l': case 'L': return 'laser';
+      case 'e': case 'E': return 'eraser';
+      case 'c': case 'C': return 'clear';
+      case '?': return 'help';
+    }
+    return null;
+  }
+
+  var REVEAL_OWN = { next: 1, prev: 1, first: 1, last: 1 };
+  var NAV = { next: 1, prev: 1, first: 1, last: 1 };
+  // Check shortly after whether the deck handled it; if not, move ourselves
+  function afterDeck(fn) {
+    var before = { slide: D.state.slide, step: D.state.step };
+    setTimeout(function () {
+      Driver.sync();
+      if (D.state.slide === before.slide && D.state.step === before.step) fn();
+    }, 40);
+  }
+  function handleKey(e) {
+    if (e.__hdek) return;
+    if (isTyping(e.target)) return;
+    var k = e.key;
+    if (/^[0-9]$/.test(k) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      gotoBuf += k; showGoto(); e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
+    if (k === 'Enter') {
+      if (gotoBuf) { var n = parseInt(gotoBuf, 10); gotoBuf = ''; showGoto(); if (n > 0) go(n - 1, 0, false); e.preventDefault(); e.stopImmediatePropagation(); return; }
+      if (D.mode === 'driver') { afterDeck(next); return; }
+      if (D.mode !== 'reveal') { next(); e.preventDefault(); }
+      return;
+    }
+    if (k === 'Escape') {
+      if (gotoBuf) { gotoBuf = ''; showGoto(); return; }
+      if (helpEl && helpEl.classList.contains('on')) { helpEl.classList.remove('on'); return; }
+      if (D.tool) { setTool(null); return; }
+      if (D.blank) { setBlank(D.blank); return; }
+      return;
+    }
+    var a = keyAction(e);
+    if (!a) return;
+    if (D.mode === 'reveal' && REVEAL_OWN[a] && ROLE === 'audience' && e.currentTarget === window) return; // reveal handles it
+    if (D.mode === 'driver' && NAV[a] && e.currentTarget === window) {
+      // Let the deck's engine go first; handle only keys it ignores (↓, ↑, …)
+      afterDeck(function () { action(a, e); });
+      return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    action(a, e);
+  }
+  function showGoto() {
+    if (!gotoEl) return;
+    clearTimeout(gotoTimer);
+    gotoEl.style.display = gotoBuf ? 'block' : 'none';
+    gotoEl.textContent = gotoBuf ? (gotoBuf + T(' 번 슬라이드로 → Enter', ' → Enter to go to slide')) : '';
+    Presenter.showGoto(gotoBuf);
+    if (gotoBuf) gotoTimer = setTimeout(function () { gotoBuf = ''; showGoto(); }, 4000);
+  }
+
+  function isInteractive(t, slideEl) {
+    if (!t || !t.closest) return false;
+    if (t.closest('a, button, input, select, textarea, label, summary, details, video, audio, iframe, [contenteditable], [data-interactive], [onclick], .hdek-ui')) return true;
+    var el = t;
+    while (el && el !== slideEl && el !== document.body && el.nodeType === 1) {
+      try { if (getComputedStyle(el).cursor === 'pointer') return true; } catch (e) { }
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  var wheelLock = 0, wheelAcc = 0;
+  function bindInput() {
+    window.addEventListener('keydown', handleKey, true);
+    document.addEventListener('click', function (e) {
+      if (!D.clickAdvance || D.tool || e.button !== 0) return;
+      if (D.mode === 'single') return;
+      var s = D.slides[D.state.slide];
+      if (isInteractive(e.target, s && s.el)) return;
+      var sel = window.getSelection && window.getSelection();
+      if (sel && String(sel).length > 0) return;
+      if (D.mode === 'driver') { afterDeck(next); return; }
+      next();
+    });
+    window.addEventListener('wheel', function (e) {
+      if (!D.wheelAdvance || e.ctrlKey || D.mode === 'single') return;
+      var el = e.target;
+      while (el && el !== document.body && el.nodeType === 1) {
+        var cs = getComputedStyle(el);
+        if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 2) return;
+        el = el.parentElement;
+      }
+      e.preventDefault();
+      var now = Date.now();
+      if (now < wheelLock) return;
+      wheelAcc += e.deltaY;
+      if (Math.abs(wheelAcc) < 30) return;
+      if (wheelAcc > 0) next(); else prev();
+      wheelAcc = 0; wheelLock = now + 450;
+    }, { passive: false });
+    var sx = null, sy = null;
+    document.addEventListener('pointerdown', function (e) { if (e.pointerType === 'touch' && !D.tool) { sx = e.clientX; sy = e.clientY; } });
+    document.addEventListener('pointerup', function (e) {
+      if (sx === null || e.pointerType !== 'touch') return;
+      var dx = e.clientX - sx, dy = e.clientY - sy; sx = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        var f = dx < 0 ? next : prev;
+        if (D.mode === 'driver') afterDeck(f); else f();
+      }
+    });
+    window.addEventListener('resize', fit);
+    window.addEventListener('beforeunload', function () { Presenter.close(); });
+    window.addEventListener('beforeprint', printPrepare);
+    window.addEventListener('afterprint', printRestore);
+  }
+
+  // ------------------------------------------------------------------ print
+  var printStyle = null, printAdded = [];
+  function printPrepare() {
+    var html = document.documentElement;
+    html.classList.add('hdek-printing', 'hdek-snap');
+    var fixed = D.staged || D.autostage || D.mode === 'driver';
+    var W = fixed ? D.width : window.innerWidth, H = fixed ? D.height : window.innerHeight;
+    var css = '@page{size:' + W + 'px ' + H + 'px;margin:0}' +
+      '@media print{html,body{background:#fff!important;overflow:visible!important;height:auto!important;margin:0!important;padding:0!important}' +
+      (D.staged ? '.hdek-stage{position:static!important;transform:none!important;width:auto!important;height:auto!important;overflow:visible!important}' : '') +
+      '.hdek-print-anc{position:static!important;transform:none!important;width:auto!important;height:auto!important;overflow:visible!important;display:block!important;padding:0!important;margin:0!important;gap:0!important;inset:auto!important;zoom:1!important}' +
+      '.hdek-slide{position:relative!important;box-sizing:border-box!important;width:' + W + 'px!important;height:' + H + 'px!important;break-after:page;page-break-after:always;overflow:hidden!important;inset:auto!important;left:auto!important;top:auto!important;transform:none!important;margin:0!important;zoom:1!important;opacity:1!important;visibility:visible!important;box-shadow:none!important}' +
+      '.hdek-ink,.hdek-backdrop,.hdek-notes-src,.hdek-print-hide{display:none!important}}';
+    printStyle = injectCSS(document, css, 'hdek-print-css');
+    if (D.mode === 'reveal') return;
+    printAdded = [];
+    if (D.autostage) D.slides.forEach(function (x) { ['transform', 'width', 'height'].forEach(function (k) { x.el.style.removeProperty(k); }); });
+    function addCls(el, c) { if (!el.classList.contains(c)) { el.classList.add(c); printAdded.push([el, c]); } }
+    if (!D.staged && D.mode !== 'single') {
+      D.slides.forEach(function (s) {
+        for (var a = s.el.parentElement; a && a !== document.body && a !== document.documentElement; a = a.parentElement) addCls(a, 'hdek-print-anc');
+      });
+      // Leave deck UI that is not a slide or its ancestor (progress bar, buttons, notes panel) out of print
+      [document.body].concat($$('.hdek-print-anc')).forEach(function (a) {
+        Array.prototype.forEach.call(a.children, function (c) {
+          if (c.classList.contains('hdek-print-anc') || c.classList.contains('hdek-slide') || /^(SCRIPT|STYLE|LINK|META)$/.test(c.tagName)) return;
+          addCls(c, 'hdek-print-hide');
+        });
+      });
+    }
+    if (D.mode === 'driver') {
+      D.slides.forEach(function (s) {
+        addCls(s.el, Driver.activeClass);
+        Driver.stepsOf(s.el).forEach(function (e) { addCls(e, 'on'); addCls(e, 'is-on'); addCls(e, 'visible'); });
+        $$('[data-type]', s.el).forEach(function (e) { if (!e.textContent) e.textContent = e.getAttribute('data-type'); });
+        void s.el.offsetWidth; finishAnimations(s.el);
+      });
+      return;
+    }
+    D.slides.forEach(function (s) {
+      s.el.classList.add('active', 'is-active', 'present');
+      setSteps(s, s.max, false);
+      void s.el.offsetWidth;
+      finishAnimations(s.el);
+    });
+  }
+  function printRestore() {
+    var html = document.documentElement;
+    html.classList.remove('hdek-printing');
+    if (printStyle) { printStyle.remove(); printStyle = null; }
+    printAdded.forEach(function (x) { x[0].classList.remove(x[1]); });
+    printAdded = [];
+    if (D.mode === 'driver') { Driver.apply(D.state, D.state, false); Driver.sync(); fit(); requestAnimationFrame(function () { html.classList.remove('hdek-snap'); }); return; }
+    fit();
+    if (D.mode !== 'reveal') {
+      D.slides.forEach(function (s, i) {
+        if (i !== D.state.slide) { s.el.classList.remove('active', 'is-active', 'present'); setSteps(s, 0, false); }
+      });
+      setSteps(D.slides[D.state.slide], D.state.step, false);
+    }
+    requestAnimationFrame(function () { html.classList.remove('hdek-snap'); });
+  }
+
+  // ------------------------------------------------------------------ presenter
+  var Presenter = (function () {
+    var w = null, els = {}, ready = { cur: false, nxt: false }, queued = {}, inkP = null;
+    var timer = { start: 0, acc: 0, running: false }, tick = null;
+    var notesSize = parseInt(store('hdek-notes-size') || '22', 10);
+    var showCurLive = store('hdek-cur-live') !== 'off';
+
+    function deckURL() {
+      if (window.__HDEK_SRC__) return window.__HDEK_SRC__;
+      return location.href.replace(/#.*$/, '');
+    }
+    function aspect() {
+      if (D.staged || D.mode === 'reveal') return { w: D.mode === 'reveal' ? (window.Reveal.getConfig().width || 960) : D.width, h: D.mode === 'reveal' ? (window.Reveal.getConfig().height || 700) : D.height };
+      return { w: window.innerWidth || 1280, h: window.innerHeight || 720 };
+    }
+
+    function open() {
+      if (ROLE !== 'audience') return;
+      if (w && !w.closed) { try { w.focus(); } catch (e) { } return; }
+      var feat = 'popup=yes,width=1280,height=800';
+      w = window.open('', 'hdek-presenter', feat);
+      if (!w) { toast(T('팝업이 차단되었습니다. 주소창의 팝업 허용 후 다시 S를 눌러 주세요', 'Popup blocked. Allow popups in the address bar, then press S again'), 4000); return; }
+      try { w.document; } catch (e) { toast(T('발표자 창을 열 수 없습니다 (보안 설정)', 'Cannot open the presenter view (security settings)')); w = null; return; }
+      build();
+      if (!timer.running && !timer.acc) startTimer();
+      toast(T('발표자 창을 열었습니다. 이 창을 프로젝터로 옮기고 F를 누르세요', 'Presenter view opened. Move this window to the projector and press F'), 3200);
+    }
+
+    function close() { try { if (w && !w.closed) w.close(); } catch (e) { } w = null; }
+
+    function build() {
+      var doc = w.document;
+      doc.open();
+      doc.write(T('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>발표자 화면 — ', '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Presenter view — ') + escapeHTML(D.title) + '</title></head><body></body></html>');
+      doc.close();
+      injectCSS(doc, PRESENTER_CSS);
+      doc.body.innerHTML = PRESENTER_HTML;
+      els = {};
+      ['cur', 'curbox', 'nxt', 'nxtbox', 'notes', 'num', 'stepn', 'elapsed', 'remain', 'clock', 'prog', 'dur', 'title', 'list', 'goto', 'hint', 'blankst', 'tools', 'endcard', 'curoff'].forEach(function (id) { els[id] = doc.getElementById(id); });
+      els.title.textContent = D.title;
+      els.notes.style.fontSize = notesSize + 'px';
+      if (D.duration) els.dur.value = D.duration;
+      ready = { cur: false, nxt: false }; queued = {};
+      var a = aspect(), url = deckURL();
+      els.curframe = mkFrame(doc, 'hdek-preview-cur', url, a, 'cur');
+      els.nxtframe = mkFrame(doc, 'hdek-preview-nxt', url, a, 'nxt');
+      els.curbox.insertBefore(els.curframe, els.curbox.firstChild);
+      els.nxtbox.insertBefore(els.nxtframe, els.nxtbox.firstChild);
+      els.curoff.style.display = showCurLive ? 'none' : 'grid';
+      // ink on presenter
+      var pc = doc.createElement('canvas'); pc.className = 'pink'; els.curbox.appendChild(pc);
+      inkP = new Ink(pc, function () { var r = els.curbox.getBoundingClientRect(); return { w: r.width || 1, h: r.height || 1, scale: 1 }; });
+      els.pink = pc;
+      bindDraw(pc, w);
+      w.addEventListener('message', onMsg);
+      w.addEventListener('keydown', handleKey, true);
+      w.addEventListener('resize', layout);
+      w.addEventListener('beforeunload', function () { w = null; });
+      doc.addEventListener('click', onClick);
+      doc.getElementById('notesminus').addEventListener('click', function () { setNotes(-2); });
+      doc.getElementById('notesplus').addEventListener('click', function () { setNotes(2); });
+      els.dur.addEventListener('change', function () { D.duration = parseFloat(els.dur.value) || 0; tickTimer(); });
+      els.elapsed.addEventListener('click', toggleTimer);
+      buildList();
+      layout();
+      setTimeout(layout, 60);
+      tick = w.setInterval(tickTimer, 500);
+      toolChanged();
+      update();
+    }
+
+    function mkFrame(doc, name, url, a, key) {
+      var f = doc.createElement('iframe');
+      f.name = name;
+      f.setAttribute('tabindex', '-1');
+      f.setAttribute('aria-hidden', 'true');
+      f.style.width = a.w + 'px'; f.style.height = a.h + 'px';
+      f.dataset.key = key;
+      if (key === 'cur' && !showCurLive) { f.src = 'about:blank'; ready.cur = false; return f; }
+      if (window.__HDEK_SRCDOC__) f.srcdoc = window.__HDEK_SRCDOC__;
+      else f.src = url;
+      return f;
+    }
+
+    function onMsg(e) {
+      var d = e.data;
+      if (!d || d.hdek !== 1) return;
+      if (d.type === 'ready') {
+        var key = (e.source === (els.curframe && els.curframe.contentWindow)) ? 'cur' : (e.source === (els.nxtframe && els.nxtframe.contentWindow)) ? 'nxt' : null;
+        if (!key) return;
+        ready[key] = true;
+        if (queued[key]) { post(key, queued[key]); }
+      }
+      if (d.type === 'key') handleKey({ key: d.key, shiftKey: d.shiftKey, target: null, preventDefault: function () { }, stopImmediatePropagation: function () { } });
+    }
+
+    function post(key, msg) {
+      var f = key === 'cur' ? els.curframe : els.nxtframe;
+      queued[key] = msg;
+      if (!f || !ready[key]) return;
+      try { f.contentWindow.postMessage(msg, '*'); } catch (e) { }
+    }
+
+    function layout() {
+      if (!w || w.closed) return;
+      var a = aspect();
+      [['cur', els.cur, els.curbox, els.curframe], ['nxt', els.nxt, els.nxtbox, els.nxtframe]].forEach(function (t) {
+        var host = t[1], box = t[2], fr = t[3];
+        if (!host || !box) return;
+        var r = host.getBoundingClientRect();
+        var s = Math.min(r.width / a.w, r.height / a.h);
+        if (!(s > 0)) return;
+        box.style.width = (a.w * s) + 'px'; box.style.height = (a.h * s) + 'px';
+        if (fr) { fr.style.width = a.w + 'px'; fr.style.height = a.h + 'px'; fr.style.transform = 'scale(' + s + ')'; }
+      });
+      renderInk();
+    }
+
+    function update() {
+      if (!w || w.closed) return;
+      var A = adapter(), st = D.state, n = A.count(), s = D.slides[st.slide];
+      els.num.textContent = (st.slide + 1) + ' / ' + n;
+      var mx = A.max(st.slide);
+      els.stepn.textContent = mx ? (T('단계 ', 'Step ') + st.step + ' / ' + mx) : '';
+      els.notes.innerHTML = (s && s.notesHTML) ? s.notesHTML : T('<span class="empty">이 슬라이드에는 노트가 없습니다.</span>', '<span class="empty">No notes for this slide.</span>');
+      els.notes.classList.toggle('rich', !!(s && /<(p|ul|ol|li|br|div|h\d)\b/i.test(s.notesHTML)));
+      els.notes.scrollTop = 0;
+      els.blankst.textContent = D.blank ? (D.blank === 'white' ? T('● 흰 화면 표시 중', '● White screen on') : T('● 검은 화면 표시 중', '● Black screen on')) : '';
+      // next state
+      var nx = null;
+      if (st.step < mx) nx = { slide: st.slide, step: st.step + 1 };
+      else if (st.slide < n - 1) nx = { slide: st.slide + 1, step: 0 };
+      if (nx) {
+        els.endcard.style.display = 'none';
+        post('nxt', { hdek: 1, type: 'goto', slide: nx.slide, step: nx.step, animate: false });
+        var lbl = w.document.getElementById('nxtlabel');
+        lbl.textContent = nx.slide === st.slide ? T('다음: 같은 슬라이드의 단계 ', 'Next: same slide, step ') + nx.step : T('다음 슬라이드 ', 'Next slide ') + (nx.slide + 1) + (D.slides[nx.slide] ? ' · ' + D.slides[nx.slide].title : '');
+      } else {
+        els.endcard.style.display = 'grid';
+        w.document.getElementById('nxtlabel').textContent = T('마지막입니다', 'End of deck');
+      }
+      post('cur', { hdek: 1, type: 'goto', slide: st.slide, step: st.step, animate: true });
+      $$('li', els.list).forEach(function (li, i) { li.classList.toggle('on', i === st.slide); });
+      var hint = (document.fullscreenElement || document.webkitFullscreenElement) ? '' : T('청중 창에서 F → 프로젝터 전체화면', 'Press F in the audience window → projector fullscreen');
+      els.hint.textContent = hint;
+    }
+
+    function buildList() {
+      els.list.querySelector('ol').innerHTML = D.slides.map(function (s, i) {
+        var mx = adapter().max(i);
+        return '<li data-i="' + i + '"><span class="n">' + (i + 1) + '</span><span class="t">' + escapeHTML(s.title) + '</span>' + (mx ? '<span class="k">' + mx + T('단계</span>', ' steps</span>') : '') + '</li>';
+      }).join('');
+    }
+
+    function onClick(e) {
+      var t = e.target;
+      var li = t.closest && t.closest('#list li');
+      if (li) { go(+li.dataset.i, 0, false); els.list.classList.remove('on'); return; }
+      var b = t.closest && t.closest('button[data-act]');
+      if (b) {
+        var a = b.dataset.act;
+        if (a === 'list') { els.list.classList.toggle('on'); return; }
+        if (a === 'reset') { timer = { start: 0, acc: 0, running: false }; startTimer(); return; }
+        if (a === 'curlive') { showCurLive = !showCurLive; store('hdek-cur-live', showCurLive ? 'on' : 'off'); build(); return; }
+        if (a === 'full') {
+          // A click in the presenter window is not user activation for the audience window, so hand focus over
+          try { window.focus(); } catch (x) { }
+          toggleFullscreen();
+          return;
+        }
+        if (a === 'color') { D.color = b.dataset.color; if (!D.tool || D.tool === 'laser' || D.tool === 'eraser') setTool('pen'); else toolChanged(); updateBar(); return; }
+        action(a);
+        return;
+      }
+      if (t.closest && t.closest('#list') && t.id === 'list') els.list.classList.remove('on');
+    }
+
+    function setNotes(d) {
+      notesSize = clamp(notesSize + d, 12, 60);
+      store('hdek-notes-size', String(notesSize));
+      if (els.notes) els.notes.style.fontSize = notesSize + 'px';
+    }
+
+    function startTimer() { timer.start = Date.now(); timer.running = true; tickTimer(); }
+    function toggleTimer() {
+      if (timer.running) { timer.acc += Date.now() - timer.start; timer.running = false; }
+      else { timer.start = Date.now(); timer.running = true; }
+      tickTimer();
+    }
+    function tickTimer() {
+      if (!w || w.closed) return;
+      var ms = timer.acc + (timer.running ? Date.now() - timer.start : 0), sec = ms / 1000;
+      els.elapsed.textContent = fmtTime(sec) + (timer.running ? '' : ' ⏸');
+      var d = new Date();
+      els.clock.textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      if (D.duration > 0) {
+        var total = D.duration * 60, left = total - sec, ratio = clamp(sec / total, 0, 1);
+        els.remain.textContent = (left >= 0 ? T('남은 시간 ', 'Remaining ') + fmtTime(left) : T('초과 ', 'Over ') + fmtTime(-left));
+        els.prog.style.width = (ratio * 100) + '%';
+        els.prog.className = left < 0 ? 'over' : (left < 60 ? 'warn' : (ratio > 0.75 ? 'mid' : ''));
+        els.remain.className = left < 0 ? 'over' : (left < 60 ? 'warn' : '');
+      } else { els.remain.textContent = ''; els.prog.style.width = '0'; }
+    }
+
+    function renderInkP(strokes, extra, lp, trail) {
+      if (!w || w.closed || !inkP) return;
+      inkP.render(strokes, extra, lp, trail);
+    }
+
+    function toolChanged() {
+      if (!w || w.closed) return;
+      if (els.pink) els.pink.classList.toggle('active', !!D.tool);
+      $$('button[data-tool]', w.document).forEach(function (b) { b.classList.toggle('on', b.dataset.tool === D.tool); });
+      $$('button[data-color]', w.document).forEach(function (b) { b.classList.toggle('on', b.dataset.color === D.color); });
+    }
+
+    function showGotoP(buf) {
+      if (!w || w.closed || !els.goto) return;
+      els.goto.style.display = buf ? 'block' : 'none';
+      els.goto.textContent = buf ? buf + T(' 번 슬라이드로 → Enter', ' → Enter to go to slide') : '';
+    }
+
+    return {
+      open: open, close: close, update: update, renderInk: renderInkP, toolChanged: toolChanged, showGoto: showGotoP,
+      isOpen: function () { return !!(w && !w.closed); }, layout: layout
+    };
+  })();
+
+  function escapeHTML(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  var PRESENTER_CSS = [
+    ':root{color-scheme:dark}',
+    '*{box-sizing:border-box}',
+    'html,body{margin:0;height:100%;background:#0e0e11;color:#ececf0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;overflow:hidden}',
+    '#app{display:grid;grid-template-rows:auto 1fr auto;height:100%}',
+    '#top{display:flex;align-items:center;gap:18px;padding:10px 16px;border-bottom:1px solid #222228;background:#141418}',
+    '#title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32vw;color:#b8b8c2}',
+    '#num{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}',
+    '#stepn{color:#8f8f9a;font-variant-numeric:tabular-nums}',
+    '.sp{flex:1}',
+    '#elapsed{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;user-select:none}',
+    '#remain{color:#9fa0aa;font-variant-numeric:tabular-nums;min-width:120px;text-align:right}',
+    '#remain.warn{color:#ffb340}#remain.over{color:#ff5a52;font-weight:700}',
+    '#clock{color:#8f8f9a;font-variant-numeric:tabular-nums}',
+    '.durw{color:#8f8f9a;font-size:13px}.durw input{width:52px;background:#1e1e24;color:#fff;border:1px solid #33333b;border-radius:6px;padding:3px 6px;font:inherit}',
+    '#pbar{height:4px;background:#1c1c22}#prog{height:100%;width:0;background:#30d158;transition:width .5s}#prog.mid{background:#ffd60a}#prog.warn{background:#ff9f0a}#prog.over{background:#ff453a}',
+    '#main{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(300px,1fr);gap:14px;padding:14px;min-height:0}',
+    '.pane{position:relative;min-height:0;display:grid;place-items:center}',
+    '#cur{background:#08080a;border-radius:10px}',
+    '.box{position:relative;overflow:hidden;background:#000;border-radius:6px;box-shadow:0 0 0 1px #2a2a31}',
+    '#curbox{box-shadow:0 0 0 2px #0a84ff55}',
+    '.box iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;pointer-events:none;background:#000}',
+    '.pink{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;touch-action:none}',
+    '.pink.active{pointer-events:auto;cursor:crosshair}',
+    '#curoff{position:absolute;inset:0;display:none;place-items:center;color:#777;font-size:14px;text-align:center;padding:20px}',
+    '#side{display:grid;grid-template-rows:minmax(0,0.9fr) auto minmax(0,1.4fr);gap:8px;min-height:0}',
+    '#nxt{background:#08080a;border-radius:10px}',
+    '#nxtlabel{color:#9a9aa5;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+    '#endcard{position:absolute;inset:0;display:none;place-items:center;color:#777;background:#0b0b0e}',
+    '#notesw{position:relative;min-height:0;display:flex;flex-direction:column;background:#141418;border-radius:10px;border:1px solid #222228}',
+    '#notesh{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid #222228;color:#8f8f9a;font-size:13px}',
+    '#notesh button{all:unset;cursor:pointer;padding:2px 9px;border-radius:6px;background:#22222a;color:#ddd;font-weight:700}',
+    '#notes{flex:1;overflow:auto;padding:14px 18px;white-space:pre-wrap;line-height:1.55}',
+    '#notes p{margin:0 0 .6em}#notes ul,#notes ol{margin:0 0 .6em;padding-left:1.3em}',
+    '#notes .empty{color:#666}',
+    '#notes.rich{white-space:normal}',
+    '#bar button[data-act="color"]{min-width:30px;padding:0 6px}',
+    '#bar{display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid #222228;background:#141418;flex-wrap:wrap}',
+    '#bar button{all:unset;cursor:pointer;height:36px;min-width:36px;padding:0 10px;border-radius:8px;background:#202027;color:#e5e5ea;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:14px}',
+    '#bar button:hover{background:#2a2a33}',
+    '#bar button.big{min-width:96px;font-weight:700;background:#2b2b35}',
+    '#bar button.on{background:#0a84ff;color:#fff}',
+    '#bar svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '#bar .sw{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.5)}',
+    '#bar .sep{width:1px;height:24px;background:#2c2c34;margin:0 6px}',
+    '#hint{color:#ffb340;font-size:13px}',
+    '#blankst{color:#ff6961;font-weight:700}',
+    '#list{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:10}',
+    '#list.on{display:block}',
+    '#list ol{list-style:none;margin:60px auto;padding:10px;max-width:720px;max-height:calc(100% - 120px);overflow:auto;background:#17171c;border-radius:14px;box-shadow:0 20px 60px #000}',
+    '#list li{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:8px;cursor:pointer}',
+    '#list li:hover{background:#24242c}#list li.on{background:#0a84ff33}',
+    '#list .n{width:30px;text-align:right;color:#888;font-variant-numeric:tabular-nums}#list .t{flex:1}#list .k{color:#888;font-size:12px}',
+    '#goto{position:fixed;right:20px;bottom:70px;padding:8px 14px;border-radius:10px;background:#0a84ff;color:#fff;font-size:18px;display:none}'
+  ].join('\n');
+
+  var PRESENTER_HTML = '' +
+    '<div id="app">' +
+    '<div><div id="top"><span id="title"></span><span id="num"></span><span id="stepn"></span><span id="blankst"></span><span class="sp"></span>' +
+    T('<span id="hint"></span><span class="durw">목표 <input id="dur" type="number" min="0" step="1" placeholder="분">분</span>', '<span id="hint"></span><span class="durw">Target <input id="dur" type="number" min="0" step="1" placeholder="min">min</span>') +
+    T('<span id="remain"></span><span id="elapsed" title="클릭: 일시정지/재개">0:00</span><span id="clock"></span></div>', '<span id="remain"></span><span id="elapsed" title="Click: pause/resume">0:00</span><span id="clock"></span></div>') +
+    '<div id="pbar"><div id="prog"></div></div></div>' +
+    '<div id="main">' +
+    T('<div id="cur" class="pane"><div id="curbox" class="box"><div id="curoff">현재 화면 미리보기가 꺼져 있습니다<br>(무거운 덱에서 성능을 아끼는 모드) — 필기는 그대로 됩니다</div></div></div>', '<div id="cur" class="pane"><div id="curbox" class="box"><div id="curoff">Live preview of the current slide is off<br>(saves performance on heavy decks) — drawing still works</div></div></div>') +
+    '<div id="side">' +
+    T('<div id="nxt" class="pane"><div id="nxtbox" class="box"><div id="endcard">마지막 슬라이드입니다</div></div></div>', '<div id="nxt" class="pane"><div id="nxtbox" class="box"><div id="endcard">This is the last slide</div></div></div>') +
+    '<div id="nxtlabel"></div>' +
+    T('<div id="notesw"><div id="notesh">발표자 노트<span class="sp"></span><button id="notesminus">A−</button><button id="notesplus">A+</button></div><div id="notes"></div></div>', '<div id="notesw"><div id="notesh">Speaker notes<span class="sp"></span><button id="notesminus">A−</button><button id="notesplus">A+</button></div><div id="notes"></div></div>') +
+    '</div></div>' +
+    '<div id="bar">' +
+    '<button class="big" data-act="prev">' + svg('prev') + T('이전</button><button class="big" data-act="next">다음', 'Prev</button><button class="big" data-act="next">Next') + svg('next') + '</button>' +
+    '<span class="sep"></span>' +
+    T('<button data-act="pen" data-tool="pen" title="펜 (D)">', '<button data-act="pen" data-tool="pen" title="Pen (D)">') + svg('pen') + '</button>' +
+    T('<button data-act="hl" data-tool="hl" title="형광펜 (H)">', '<button data-act="hl" data-tool="hl" title="Highlighter (H)">') + svg('hl') + '</button>' +
+    T('<button data-act="laser" data-tool="laser" title="레이저 (L)">', '<button data-act="laser" data-tool="laser" title="Laser (L)">') + svg('laser') + '</button>' +
+    T('<button data-act="eraser" data-tool="eraser" title="지우개 (E)">', '<button data-act="eraser" data-tool="eraser" title="Eraser (E)">') + svg('eraser') + '</button>' +
+    COLORS.slice(0, 4).map(function (c) { return '<button data-act="color" data-color="' + c + T('" title="색"><span class="sw" style="background:', '" title="Color"><span class="sw" style="background:') + c + '"></span></button>'; }).join('') +
+    T('<button data-act="clear" title="이 슬라이드 필기 지우기 (C)">', '<button data-act="clear" title="Clear ink on this slide (C)">') + svg('clear') + '</button>' +
+    '<span class="sep"></span>' +
+    T('<button data-act="blank" title="검은 화면 (B)">', '<button data-act="blank" title="Black screen (B)">') + svg('blank') + '</button>' +
+    T('<button data-act="list" title="슬라이드 목록">', '<button data-act="list" title="Slide list">') + svg('list') + T('목록</button>', 'Slides</button>') +
+    T('<button data-act="full" title="청중 화면 전체화면 (F)">', '<button data-act="full" title="Audience fullscreen (F)">') + svg('full') + '</button>' +
+    T('<button data-act="curlive" title="현재 화면 실시간 미리보기 켜기/끄기">미리보기</button>', '<button data-act="curlive" title="Toggle live preview of the current slide">Preview</button>') +
+    T('<button data-act="reset" title="타이머 재시작">타이머 ↺</button>', '<button data-act="reset" title="Restart timer">Timer ↺</button>') +
+    T('<button data-act="print" title="모든 단계를 펼쳐 인쇄/PDF 저장">PDF</button>', '<button data-act="print" title="Print / save PDF with every step revealed">PDF</button>') +
+    '</div>' +
+    '<div id="list"><ol></ol></div><div id="goto"></div>' +
+    '</div>';
+
+  // ------------------------------------------------------------------ preview role
+  function setupPreview() {
+    document.documentElement.classList.add('hdek-preview');
+    var muteAll = function () { $$('video, audio').forEach(function (m) { m.muted = true; m.volume = 0; }); };
+    muteAll();
+    try { new MutationObserver(muteAll).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { }
+    window.addEventListener('message', function (e) {
+      var d = e.data;
+      if (!d || d.hdek !== 1) return;
+      if (d.type === 'goto') go(d.slide, d.step, d.animate);
+    });
+    window.addEventListener('keydown', function (e) {
+      if (e.__hdek || !e.isTrusted) return; // never echo our own synthetic keys back
+      try { window.parent.postMessage({ hdek: 1, type: 'key', key: e.key, shiftKey: e.shiftKey }, '*'); } catch (x) { }
+    });
+    window.addEventListener('resize', fit);
+    try { window.parent.postMessage({ hdek: 1, type: 'ready', count: adapter().count() }, '*'); } catch (e) { }
+  }
+
+  // ------------------------------------------------------------------ init
+  function start() {
+    if (D.ready) return;
+    var html = document.documentElement;
+    injectCSS(document, CSS, 'hdek-runtime-css');
+    if (window.Reveal && document.querySelector('.reveal .slides')) {
+      var R = window.Reveal;
+      var boot = function () {
+        RevealAdapter.transition = (R.getConfig && R.getConfig().transition) || 'slide';
+        if (ROLE === 'preview') R.configure({ transition: 'none', controls: false, progress: false, keyboard: false, slideNumber: false });
+        D.adapter = RevealAdapter;
+        RevealAdapter.init();
+        finishInit();
+      };
+      if (R.isReady && R.isReady()) boot(); else if (R.on) R.on('ready', boot); else boot();
+      return;
+    }
+    detect();
+    html.classList.add('hdek-on');
+    if (D.mode === 'driver') {
+      // The deck's own engine owns the screen; we only read its state and steer with keys.
+      html.classList.add('hdek-own');
+      D.state = Driver.read();
+      D.slides.forEach(function (x, i) { x.el.classList.toggle('hdek-current', i === D.state.slide); });
+      finishInit();
+      return;
+    }
+    if (D.staged) { html.classList.add('hdek-staged'); D.root.classList.add('hdek-stage'); }
+    if (D.autostage) {
+      html.classList.add('hdek-autostage');
+      var bd = document.createElement('div'); bd.className = 'hdek-backdrop'; document.body.appendChild(bd);
+    }
+    // every slide to step 0
+    D.slides.forEach(function (s) { setSteps(s, 0, false); });
+    var startAt = (ROLE === 'audience' && parseHash()) || { slide: 0, step: 0 };
+    startAt.slide = clamp(startAt.slide, 0, D.slides.length - 1);
+    startAt.step = clamp(startAt.step, 0, D.slides[startAt.slide].max);
+    D.state = { slide: -1, step: 0 };
+    Native.apply({ slide: -1, step: 0 }, startAt, false);
+    D.state = startAt;
+    fit();
+    finishInit();
+  }
+
+  function finishInit() {
+    D.ready = true;
+    if (ROLE === 'preview') { setupPreview(); return; }
+    setupUI();
+    setupInk();
+    bindInput();
+    fit();
+    afterChange(true);
+    document.documentElement.setAttribute('data-hdek-mode', D.mode);
+    console.info('[' + PRODUCT + ' ' + VERSION + '] mode=' + D.mode + ' slides=' + adapter().count() + (D.staged ? ' stage=' + D.width + 'x' + D.height : ''));
+  }
+
+  // ------------------------------------------------------------------ public API
+  api.__runtime = true;
+  api.version = VERSION;
+  api.next = function () { next(); };
+  api.prev = function () { prev(); };
+  api.goto = function (slide, step, animate) { go(slide, step || 0, animate); };
+  api.state = function () { return { slide: D.state.slide, step: D.state.step, count: adapter().count(), max: adapter().max(D.state.slide), mode: D.mode, role: ROLE }; };
+  api.slides = function () { return D.slides.map(function (s) { return { id: s.id, title: s.title, steps: s.max, notes: s.notesHTML }; }); };
+  api.onChange = function (fn) { D.listeners.push(fn); };
+  api.register = function (idOrEl, hook) {
+    var id = typeof idOrEl === 'string' ? idOrEl : (idOrEl && (idOrEl.getAttribute('data-slide') || idOrEl.id));
+    pendingHooks[id] = hook;
+    var s = D.slides.filter(function (x) { return x.id === id || x.el === idOrEl; })[0];
+    if (s) {
+      attachHook(s, hook);
+      if (D.ready) {
+        var i = D.slides.indexOf(s);
+        setSteps(s, i === D.state.slide ? D.state.step : 0, false);
+        if (Presenter.isOpen()) Presenter.update();
+      }
+    }
+  };
+  api.presenter = function () { Presenter.open(); };
+  api.tool = function (t) { setTool(t || null); };
+  api.ink = function () { return JSON.parse(JSON.stringify(D.ink)); };
+  api.__debug = D;
+
+  // Contract decks start right away; others start after the deck's own load handlers (auto-fit etc.)
+  function afterLoad(fn) {
+    var run = function () { requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(fn, 30); }); }); };
+    if (document.readyState === 'complete') run(); else window.addEventListener('load', run);
+  }
+  function boot() {
+    if (document.querySelector('[data-hdek], [data-slide]') || (window.Reveal && document.querySelector('.reveal .slides'))) start();
+    else afterLoad(start);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
