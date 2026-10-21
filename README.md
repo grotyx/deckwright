@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.2.0-111111?style=flat-square" alt="Version 0.2.0">
+  <img src="https://img.shields.io/badge/version-0.3.0-111111?style=flat-square" alt="Version 0.3.0">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -80,7 +80,7 @@ Double-click the new file, press `S`, drag the audience window to the projector 
 | Going back never replays an animation | Every screen is `(slide, step)`; back snaps to the final look of that step |
 | The presenter's previews look exactly like the projector | The previews load the same deck again in preview mode, CSS, JS and video included |
 | The clicker works | Arrow keys, PageUp/PageDown, F5, the blank-screen key, mouse wheel and click |
-| Nothing breaks without Wi-Fi | `build` inlines every asset; `check` warns about CDNs and web fonts |
+| Nothing breaks without Wi-Fi | `build` inlines every asset; `--fetch-fonts` downloads web fonts (Google Fonts) into the file; `check` warns about anything still online |
 | Ink stays where you put it | Saved per slide, shown on both screens, kept through a reload |
 | The handout has every step | `Ctrl/⌘+P` prints the final state of each slide, one per page |
 | Your original is safe | `inject` and `build` write a new file next to it |
@@ -119,6 +119,7 @@ npx skills add grotyx/deckwright -g     # every project
 | "package it as .hdek" | A ZIP package for decks with large videos, opened with the player |
 | "export a PDF and PPTX backup" | For conferences that only take PPTX or PDF: each slide's final look, notes in the PPTX notes |
 | "check my deck before the talk" | External CDNs, web fonts, missing files, slides without notes |
+| "put the fonts inside the file" | Web fonts are downloaded and embedded (`--fetch-fonts`), only the slices for the characters the deck uses |
 
 ## Presenting
 
@@ -143,6 +144,7 @@ The interface follows the browser language (English or Korean).
 | `deckwright build <input> [-o talk.html]` | One self-contained HTML with the runtime and every asset (default `<name>_single.html` next to the input) |
 | `deckwright pack <input> [-o talk.hdek]` | `.hdek` package (ZIP) for large videos or many files |
 | `deckwright unpack <talk.hdek> -o dir` | Extract a package |
+| `… --fetch-fonts` (with `build`, `inject`, `pack`) | Download web fonts such as Google Fonts and embed them, so the deck looks the same offline. Only the font slices for characters that appear in the deck are kept (a 31-slide Korean deck with Noto Sans KR in 4 weights: +0.8 MB instead of +4.5 MB) |
 | `deckwright check <input>` | Slides, steps, notes, external references and missing files |
 | `deckwright export <input> --pdf a.pdf --pptx a.pptx --png dir/` | Final state of each slide as PDF, PPTX or PNG (needs Playwright; `--wait 400` ms per slide) |
 | `deckwright runtime -o file.js` | The runtime script on its own |
@@ -190,7 +192,7 @@ Effects, JS hooks for counters and charts, events, the `.hdek` format and how ot
 
 [User guide](docs/manual.md) &middot; [Spec (hdek/1)](SPEC.md) &middot; [Skill instructions](skills/deckwright/SKILL.md) &middot; [Changelog](CHANGELOG.md)
 
-Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 87 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
+Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 94 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
 
 ## Author
 

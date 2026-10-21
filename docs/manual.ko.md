@@ -1,6 +1,6 @@
 # DeckWright 사용 설명서
 
-[English](manual.md) · 한국어 · v0.2.0
+[English](manual.md) · 한국어 · v0.3.0
 
 발표 하나를 처음부터 끝까지 따라간다. 설치하고, HTML 덱을 발표할 수 있게 만들고, 두 화면으로 발표하고, 슬라이드에 필기하고, 학회가 요구하는 파일을 만드는 순서다.
 
@@ -124,6 +124,8 @@ Chrome, Edge, Firefox, Safari 중 하나로 파일을 연다.
 
 `export` 에는 Playwright 와 pptxgenjs 가 필요하다: `npm i -g playwright pptxgenjs && npx playwright install chromium`. PPTX·PDF 는 백업용이다. 각 슬라이드의 최종 모습이 들어가고 애니메이션은 들어가지 않는다.
 
+웹폰트(Google Fonts 등)는 파일 안에 넣지 않으면 인터넷이 필요하다. 인터넷이 될 때 `build`, `inject`, `pack` 에 `--fetch-fonts` 를 붙여 만든다.
+
 발표 전에 최종 파일로 `deckwright check` 를 돌려 두자. 인터넷에서 불러오는 것(웹폰트, CDN 스크립트), 없는 파일, 노트 없는 슬라이드를 알려 준다.
 
 ## 7. 플레이어와 .hdek 패키지
@@ -148,7 +150,7 @@ deckwright pack talk/ -o talk.hdek
 
 **클리커가 안 먹힌다.** 청중 창이나 발표자 창을 한 번 클릭해 포커스를 준다. 클리커 대부분은 `PageDown`·`PageUp` 을 보내고 DeckWright는 이를 알아듣는다.
 
-**학회장에서 글꼴이 달라 보인다.** 덱이 인터넷에서 웹폰트를 불러오고 있다. `deckwright check` 로 확인한 뒤 AI에게 폰트를 `fonts/` 폴더에 받아 넣고 다시 빌드해 달라고 한다.
+**학회장에서 글꼴이 달라 보인다.** 덱이 인터넷에서 웹폰트(Google Fonts)를 불러오는데 학회장에 인터넷이 없다. 파일을 만들 때 `--fetch-fonts` 를 붙인다: `deckwright inject talk.html --fetch-fonts` 또는 `deckwright build talk/ --fetch-fonts`. 인터넷이 되는 노트북에서 한 번 내려받아 파일 안에 넣고, 덱에 나오는 글자에 필요한 조각만 남긴다. 채팅에서는 "폰트도 파일 안에 넣어 줘" 라고 하면 된다.
 
 **두 장씩 넘어가거나 단계를 건너뛴다.** DeckWright가 알아보지 못한 키 처리 코드가 덱에 있다. 덱(또는 줄인 사본)과 함께 <https://github.com/grotyx/deckwright/issues> 에 알려 주면 고친다.
 

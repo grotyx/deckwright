@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.2.0-111111?style=flat-square" alt="Version 0.2.0">
+  <img src="https://img.shields.io/badge/version-0.3.0-111111?style=flat-square" alt="Version 0.3.0">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -79,7 +79,7 @@ $ deckwright inject talk.html
 | 뒤로 가도 애니메이션이 다시 돌지 않는다 | 모든 화면은 `(슬라이드, 단계)`. 뒤로 가면 그 단계의 최종 모습으로 바로 바뀐다 |
 | 발표자 창 미리보기가 프로젝터 화면과 똑같다 | 같은 덱을 미리보기 모드로 한 번 더 띄운다. CSS, JS, 영상까지 같다 |
 | 클리커가 먹힌다 | 방향키, PageUp/PageDown, F5, 검은 화면 버튼, 휠, 클릭 |
-| 와이파이가 없어도 깨지지 않는다 | `build` 가 모든 자원을 파일 안에 넣는다. `check` 가 CDN·웹폰트를 경고한다 |
+| 와이파이가 없어도 깨지지 않는다 | `build` 가 모든 자원을 파일 안에 넣는다. `--fetch-fonts` 는 Google Fonts 같은 웹폰트까지 내려받아 넣는다. 아직 인터넷에 기대는 것은 `check` 가 경고한다 |
 | 필기가 그 자리에 남는다 | 슬라이드마다 저장되고, 양쪽 화면에 보이고, 새로고침해도 남는다 |
 | 유인물에 모든 단계가 들어간다 | `Ctrl/⌘+P` 로 각 슬라이드의 최종 모습을 한 쪽씩 인쇄 |
 | 원본은 안전하다 | `inject`, `build` 는 옆에 새 파일을 만든다 |
@@ -118,6 +118,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 | ".hdek 으로 묶어 줘" | 영상이 큰 덱용 ZIP 패키지. 플레이어로 연다 |
 | "PDF랑 PPTX 백업 만들어 줘" | PPTX·PDF만 받는 학회용. 슬라이드별 최종 화면, 노트는 PPTX 노트로 |
 | "발표 전에 덱 점검해 줘" | 외부 CDN, 웹폰트, 없는 파일, 노트 없는 슬라이드 |
+| "폰트도 파일 안에 넣어 줘" | 웹폰트를 내려받아 넣는다(`--fetch-fonts`). 덱에 쓰인 글자에 필요한 조각만 |
 
 ## 발표할 때
 
@@ -142,6 +143,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 | `deckwright build <입력> [-o talk.html]` | 런타임과 모든 자원을 넣은 단독 HTML (기본: 입력 옆에 `<이름>_single.html`) |
 | `deckwright pack <입력> [-o talk.hdek]` | 영상이 크거나 파일이 많을 때 쓰는 `.hdek` 패키지(ZIP) |
 | `deckwright unpack <talk.hdek> -o 폴더` | 패키지 풀기 |
+| `… --fetch-fonts` (`build`, `inject`, `pack` 에) | Google Fonts 같은 웹폰트를 내려받아 파일 안에 넣는다. 오프라인에서도 같은 글꼴로 보인다. 덱에 나오는 글자에 필요한 조각만 남긴다(Noto Sans KR 4가지 굵기를 쓰는 31장짜리 한글 덱: 4.5MB 대신 0.8MB 증가) |
 | `deckwright check <입력>` | 슬라이드, 단계, 노트, 외부 참조, 없는 파일 점검 |
 | `deckwright export <입력> --pdf a.pdf --pptx a.pptx --png 폴더/` | 슬라이드별 최종 화면을 PDF, PPTX, PNG로 (Playwright 필요, 슬라이드당 대기 `--wait 400` ms) |
 | `deckwright runtime -o file.js` | 런타임 스크립트만 꺼내기 |
@@ -189,7 +191,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 [사용 설명서](docs/manual.ko.md) &middot; [규약 (hdek/1)](SPEC.ko.md) &middot; [스킬 지시문](skills/deckwright/SKILL.md) &middot; [변경 내역](CHANGELOG.ko.md)
 
-개발: `npm run build` 로 플레이어·데모·스킬 zip을 다시 만들고, `npm test` 로 Chromium·명령줄 검사 87개를 돌린다. 코드 리뷰에서 찾은 결함마다 회귀 테스트가 들어 있다(Python용 Playwright, `pdfplumber`, `python-pptx` 필요).
+개발: `npm run build` 로 플레이어·데모·스킬 zip을 다시 만들고, `npm test` 로 Chromium·명령줄 검사 94개를 돌린다. 코드 리뷰에서 찾은 결함마다 회귀 테스트가 들어 있다(Python용 Playwright, `pdfplumber`, `python-pptx` 필요).
 
 ## 저자
 

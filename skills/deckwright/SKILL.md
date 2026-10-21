@@ -25,7 +25,7 @@ Run the CLI as `node <skill>/scripts/deckwright.mjs <command> …`, where `<skil
 **A. The user already has an HTML deck** (made by any AI or by hand, no DeckWright markup):
 
 1. `node <skill>/scripts/deckwright.mjs check <deck.html or folder>` to see what it detects (slides, external assets).
-2. `node <skill>/scripts/deckwright.mjs inject <deck.html>` writes `<name>_DeckWright.html` next to the original. It only adds the runtime; images and videos still load from the original folder, and the original file is not touched. This is the lightest option and the right default.
+2. `node <skill>/scripts/deckwright.mjs inject <deck.html>` (add `--fetch-fonts` when `check` reports web fonts) writes `<name>_DeckWright.html` next to the original. It only adds the runtime; images and videos still load from the original folder, and the original file is not touched. This is the lightest option and the right default.
 3. If the user wants one file to email or carry on USB: `build <input>` (inlines all assets; writes `<name>_single.html` next to the input). If the deck has large videos (>50 MB total): `pack <input> -o talk.hdek` and open it with `player.html`.
 
 The runtime auto-detects decks without the contract: decks with their own navigation engine are driven through that engine (their animations are kept), stacked fixed-size slides are scaled to fit, reveal.js decks are recognized, and `.notes` / `aside.notes` become speaker notes. Never rewrite the user's deck just to add DeckWright unless they ask.
@@ -66,7 +66,7 @@ The runtime auto-detects decks without the contract: decks with their own naviga
 
 ## Avoid
 
-- External CDNs (fonts, icons, chart libraries). Download what you need into the folder; conference venues may have no internet. `check` warns about these.
+- External CDNs (fonts, icons, chart libraries). Download what you need into the folder; conference venues may have no internet. `check` warns about these. For web fonts that are already in a deck (Google Fonts links), add `--fetch-fonts` to `inject`, `build` or `pack`: it downloads them and embeds only the slices for characters the deck uses.
 - Your own keyboard navigation, progress bar or slide counter. The runtime handles them.
 - Anything that makes the screen differ between loads (`Math.random()`, current time). The presenter previews would not match the audience screen.
 - Patient-identifying images or video.

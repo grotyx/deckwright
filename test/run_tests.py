@@ -338,6 +338,39 @@ check('inject writes <name>_DeckWright.html and leaves the original alone', os.p
 check('unpack keeps the Korean file name', os.path.exists(os.path.join(TMP, 'u', 'img', '한글 그림.png')))
 check('export wrote a 7-page PDF', os.path.exists(os.path.join(TMP, 'd.pdf')) and __import__('pdfplumber').open(os.path.join(TMP, 'd.pdf')).pages.__len__() == 7)
 
+print('Web fonts (--fetch-fonts)')
+import http.server, socketserver, threading, functools
+wf = os.path.join(TMP, 'webfont-host'); os.makedirs(wf, exist_ok=True)
+open(os.path.join(wf, 'a.woff2'), 'wb').write(b'wOF2-hangul-slice')
+open(os.path.join(wf, 'b.woff2'), 'wb').write(b'wOF2-cyrillic-slice')
+open(os.path.join(wf, 'css2'), 'w').write("""@font-face { font-family: 'T'; font-weight: 400; src: url(a.woff2) format('woff2'); unicode-range: U+AC00-D7A3; }
+@font-face { font-family: 'T'; font-weight: 700; src: url(a.woff2) format('woff2'); unicode-range: U+AC00-D7A3; }
+@font-face { font-family: 'T'; font-weight: 400; src: url(b.woff2) format('woff2'); unicode-range: U+0400-045F; }
+""")
+class Quiet(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, *a): pass
+srv = socketserver.TCPServer(('127.0.0.1', 0), functools.partial(Quiet, directory=wf)); port = srv.server_address[1]
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+fd = os.path.join(TMP, 'webfont-deck'); os.makedirs(os.path.join(fd, 'css'), exist_ok=True)
+css_url = f'http://127.0.0.1:{port}/css2?family=T:wght@400;700&amp;display=swap'
+open(os.path.join(fd, 'index.html'), 'w').write(f'<!doctype html><html><head><meta charset="utf-8"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="{css_url}"><link rel="stylesheet" href="css/x.css"><style>body{{font-family:T}}</style></head><body><main data-hdek><section data-slide="a"><h1>가나다</h1></section></main></body></html>')
+open(os.path.join(fd, 'css', 'x.css'), 'w').write(f'@import url("http://127.0.0.1:{port}/css2?family=T:wght@400");\nh1{{color:red}}')
+r = cli('build', fd, '--fetch-fonts', '-o', os.path.join(TMP, 'wf.html'))
+h = open(os.path.join(TMP, 'wf.html'), encoding='utf-8').read()
+check('build --fetch-fonts embeds the web font', 'data:font/woff2;base64,' + base64.b64encode(b'wOF2-hangul-slice').decode() in h and 'Web fonts embedded' in r.stdout, r.stdout + r.stderr)
+check('only slices for characters in the deck are kept', base64.b64encode(b'wOF2-cyrillic-slice').decode() not in h)
+check('one font file per slice (weights merged into a range)', h.count(base64.b64encode(b'wOF2-hangul-slice').decode()) == 2 and 'font-weight: 400 700' in h, h.count(base64.b64encode(b'wOF2-hangul-slice').decode()))
+check('no request to the font host is left', not _re.search(r'(href|url)\(?=?["\']?http://127\.0\.0\.1', h) and 'rel="preconnect"' not in h)
+r = cli('build', fd, '-o', os.path.join(TMP, 'wf0.html'))
+check('without --fetch-fonts: nothing is downloaded and a hint is shown', '--fetch-fonts' in r.stdout and 'data:font/woff2' not in open(os.path.join(TMP, 'wf0.html'), encoding='utf-8').read(), r.stdout)
+r = cli('inject', os.path.join(fd, 'index.html'), '--fetch-fonts')
+inj = open(os.path.join(fd, 'index_DeckWright.html'), encoding='utf-8').read()
+check('inject --fetch-fonts embeds fonts and keeps local references', 'data:font/woff2' in inj and 'href="css/x.css"' in inj, r.stdout + r.stderr)
+r = cli('pack', fd, '--fetch-fonts', '-o', os.path.join(TMP, 'wf.hdek'))
+zx = zipfile.ZipFile(os.path.join(TMP, 'wf.hdek'))
+check('pack --fetch-fonts rewrites the page and its CSS files', 'data:font/woff2' in zx.read('index.html').decode() and 'data:font/woff2' in zx.read('css/x.css').decode(), r.stdout + r.stderr)
+srv.shutdown()
+
 ok = sum(1 for r in results if r[1]); total = len(results)
 print(f'\n{ok}/{total} passed')
 sys.exit(0 if ok == total else 1)

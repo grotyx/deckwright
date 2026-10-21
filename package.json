@@ -1,6 +1,6 @@
 {
   "name": "deckwright",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Present AI-generated HTML slide decks like PowerPoint: click steps, presenter view with notes and timer, pen, print to PDF. Single HTML or .hdek package.",
   "keywords": ["presentation", "slides", "html", "presenter-view", "speaker-notes", "claude-code", "skill", "hdek"],
   "homepage": "https://github.com/grotyx/deckwright",

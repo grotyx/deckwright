@@ -1,4 +1,4 @@
-/*! DeckWright core v0.2.0 | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright core v0.3.0 | MIT License | https://github.com/grotyx/deckwright
  *  Shared by player.html (browser) and the CLI (Node):
  *  runtime injection, local asset inlining, .hdek (ZIP) read/write, manifest, static checks.
  */
@@ -93,6 +93,73 @@
     return a.map(function () { return '..'; }).concat(b).join('/');
   }
 
+  // ---------------------------------------------------------------- web fonts
+  function isRemote(u) { return /^(https?:)?\/\//i.test(u || ''); }
+  function absURL(u) { return /^\/\//.test(u) ? 'https:' + u : u; }
+  /** URLs worth downloading with fetchFonts: font stylesheets (Google Fonts and the like) and font files */
+  function isWebFont(u, fromFontCSS) {
+    if (!isRemote(u)) return false;
+    if (fromFontCSS) return true; // everything a font stylesheet points at (font files, nested @imports)
+    return /\/\/fonts\.(googleapis|gstatic)\.com\//i.test(u) || /\/css2?\?family=/i.test(u) ||
+      /\.(woff2?|ttf|otf)(?:[?#]|$)/i.test(u) || (/\.css(?:[?#]|$)/i.test(u) && /font|pretendard|noto|nanum|spoqa|suit\b|gmarket|wanted/i.test(u));
+  }
+  function parseRanges(s) {
+    return s.split(',').map(function (r) {
+      r = r.trim().replace(/^u\+/i, '');
+      if (/\?/.test(r)) return [parseInt(r.replace(/\?/g, '0'), 16), parseInt(r.replace(/\?/g, 'f'), 16)];
+      var p = r.split('-');
+      return [parseInt(p[0], 16), parseInt(p[1] || p[0], 16)];
+    }).filter(function (x) { return !isNaN(x[0]) && !isNaN(x[1]); });
+  }
+  /** Drop @font-face blocks whose unicode-range covers no character the deck uses (Korean fonts come in ~100 slices) */
+  function pruneFontFaces(css, chars) {
+    if (!chars) return css;
+    return css.replace(/@font-face\s*\{[^}]*\}/gi, function (block) {
+      var m = /unicode-range\s*:\s*([^;}]+)/i.exec(block);
+      if (!m) return block;
+      var ranges = parseRanges(m[1]);
+      for (var i = 0; i < ranges.length; i++) for (var c = 0; c < chars.length; c++) if (chars[c] >= ranges[i][0] && chars[c] <= ranges[i][1]) return block;
+      return '';
+    });
+  }
+  /**
+   * Google Fonts lists a variable font once per requested weight, all pointing at the same file.
+   * Merge those blocks into one with a weight range so each font file is embedded only once.
+   */
+  function mergeSameSrcFaces(css) {
+    var groups = Object.create(null), order = [];
+    var rest = css.replace(/@font-face\s*\{([^}]*)\}/gi, function (all, body) {
+      var src = /src\s*:\s*([^;]+)/i.exec(body), w = /font-weight\s*:\s*([^;]+)/i.exec(body);
+      if (!src) return all;
+      var key = body.replace(/font-weight\s*:[^;]+;?/i, '').replace(/\s+/g, ' ').trim();
+      if (!groups[key]) { groups[key] = { body: body, weights: [] }; order.push(key); }
+      (w ? w[1].trim().split(/\s+/) : ['400']).forEach(function (x) { var n = parseInt(x, 10); if (n) groups[key].weights.push(n); });
+      return '\u0000' + order.indexOf(key) + '\u0000';
+    });
+    var emitted = Object.create(null);
+    return rest.replace(/\u0000(\d+)\u0000/g, function (all, i) {
+      var key = order[+i];
+      if (emitted[key]) return '';
+      emitted[key] = 1;
+      var g = groups[key], lo = Math.min.apply(null, g.weights), hi = Math.max.apply(null, g.weights);
+      var body = /font-weight\s*:/i.test(g.body) ? g.body.replace(/font-weight\s*:\s*[^;]+/i, 'font-weight: ' + (lo === hi ? lo : lo + ' ' + hi)) : g.body;
+      return '@font-face {' + body + '}';
+    });
+  }
+
+  /** Code points that appear anywhere in the given texts (plus printable ASCII), sorted */
+  function usedChars(texts) {
+    var seen = Object.create(null), out = [];
+    for (var a = 32; a < 127; a++) { seen[a] = 1; out.push(a); }
+    texts.forEach(function (t) {
+      for (var i = 0; i < t.length; i++) {
+        var cp = t.codePointAt(i); if (cp > 0xFFFF) i++;
+        if (!seen[cp]) { seen[cp] = 1; out.push(cp); }
+      }
+    });
+    return out.sort(function (x, y) { return x - y; });
+  }
+
   // ---------------------------------------------------------------- HTML tokenizing
   // Split out script/style/comment blocks so attribute rewriting only touches plain markup.
   var BLOCK_RE = /<script\b[^>]*>[\s\S]*?<\/script\s*>|<style\b[^>]*>[\s\S]*?<\/style\s*>|<!--[\s\S]*?-->/gi;
@@ -124,6 +191,8 @@
    * opts.read     : async (path) → Uint8Array | null
    * opts.urlFor   : (bytes, mime, path) → string   (default: data URL)
    * opts.mode     : 'inline' (default) | 'collect' (only list files, leave HTML as is)
+   * opts.fetch    : async (url) → Uint8Array | null   — download web fonts (Google Fonts etc.) and inline them
+   * opts.chars    : code points used by the deck; font slices (unicode-range) for other characters are dropped
    */
   async function inlineHTML(html, opts) {
     opts = opts || {};
@@ -131,7 +200,24 @@
     var read = opts.read;
     var urlFor = opts.urlFor || function (bytes, mime) { return dataURL(bytes, mime); };
     var collect = opts.mode === 'collect';
-    var report = { external: [], missing: [], used: [], outside: [], warnings: [] };
+    var report = { external: [], missing: [], used: [], outside: [], warnings: [], fetched: [], fetchFailed: [] };
+    var remoteCache = Object.create(null), fetchedBytes = 0;
+    var fetchOn = typeof opts.fetch === 'function' && !collect;
+    async function loadRemote(u) {
+      if (u in remoteCache) return remoteCache[u];
+      var b = null;
+      try { b = await opts.fetch(u); } catch (e) { b = null; }
+      remoteCache[u] = b;
+      if (b) { note(report.fetched, u); fetchedBytes += b.length; } else note(report.fetchFailed, u);
+      return b;
+    }
+    function isCSSURL(u) { return /\/css2?\?|\.css(?:[?#]|$)/i.test(u); }
+    // fetched font CSS: keep only the slices the deck needs, then inline what it points at
+    async function remoteCSS(u, depth) {
+      var b = await loadRemote(u);
+      if (!b) return null;
+      return inlineCSS(mergeSameSrcFaces(pruneFontFaces(utf8Decode(b), opts.chars)), u, depth + 1);
+    }
     var cache = Object.create(null);
 
     function note(list, v) { if (list.indexOf(v) < 0) list.push(v); }
@@ -148,7 +234,17 @@
     async function urlOf(ref, fromPath, depth) {
       ref = unescAttr(ref.trim());
       if (isSkippable(ref)) return null;
-      if (isExternal(ref)) { note(report.external, ref); return null; }
+      var fromRemote = isRemote(fromPath);
+      if (fromRemote && !isExternal(ref)) { try { ref = new URL(ref, fromPath).href; } catch (e) { return null; } }
+      if (isExternal(ref)) {
+        if (fetchOn && isWebFont(ref, fromRemote) && (depth || 0) <= 8) {
+          var u = absURL(ref);
+          if (isCSSURL(u)) { var c = await remoteCSS(u, depth || 0); if (c !== null) return urlFor(utf8Encode(c), 'text/css', u); }
+          else { var fb = await loadRemote(u); if (fb) return urlFor(fb, mimeOf(u.replace(/[?#].*$/, '')), u); }
+        }
+        if (!fromRemote) note(report.external, ref);
+        return null;
+      }
       var p = resolvePath(fromPath, ref);
       if (!p) return null;
       var bytes = await load(p);
@@ -178,7 +274,15 @@
       css = css.replace(/\/\*[\s\S]*?\*\//g, '');
       css = await replaceAsync(css, /@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|"([^"]*)"|'([^']*)')([^;]*);/gi, async function (all, a1, a2, a3, a4, a5, rest) {
         var ref = [a1, a2, a3, a4, a5].filter(function (x) { return x !== undefined; })[0] || '';
-        if (isExternal(ref)) { note(report.external, ref); return all; }
+        var fromRemote = isRemote(fromPath);
+        if (fromRemote && !isExternal(ref)) { try { ref = new URL(ref, fromPath).href; } catch (e) { return all; } }
+        if (isExternal(ref)) {
+          var inner0 = (fetchOn && isWebFont(ref, fromRemote) && depth <= 8) ? await remoteCSS(absURL(ref), depth) : null;
+          if (inner0 === null) { if (!fromRemote) note(report.external, ref); return all; }
+          rest = (rest || '').trim();
+          if (/^(layer|supports)\b/i.test(rest)) return '@import url("' + urlFor(utf8Encode(inner0), 'text/css', ref) + '") ' + rest + ';';
+          return rest ? '@media ' + rest + '{' + inner0 + '}' : inner0;
+        }
         var p = resolvePath(fromPath, ref);
         var b = await load(p);
         if (!b || depth > 8) return all;
@@ -254,7 +358,16 @@
           if (name === 'link') {
             var rel = (getAttr(tag, 'rel') || '').toLowerCase(), href = getAttr(tag, 'href');
             if (!href || isSkippable(href)) return tag;
-            if (isExternal(href)) { if (/stylesheet|preload|icon|modulepreload/.test(rel)) note(report.external, href); return tag; }
+            if (isExternal(href)) {
+              if (/stylesheet/.test(rel) && fetchOn && isWebFont(href)) {
+                var rs = await remoteCSS(absURL(unescAttr(href)), 0);
+                if (rs !== null) { var rmedia = getAttr(tag, 'media'); return '<style' + (rmedia ? ' media="' + escAttr(rmedia) + '"' : '') + ' data-hdek-from="' + escAttr(href) + '">' + rs + '</style>'; }
+              }
+              // preconnect hints for a font host are pointless once the fonts are inside the file
+              if (/preconnect|dns-prefetch/.test(rel) && fetchOn && /fonts\.(googleapis|gstatic)\.com/i.test(href)) return '';
+              if (/stylesheet|preload|icon|modulepreload/.test(rel)) note(report.external, href);
+              return tag;
+            }
             if (/stylesheet/.test(rel)) {
               var p2 = resolvePath(base, unescAttr(href));
               var b2 = await load(p2);
@@ -305,6 +418,7 @@
       }
     }
     report.html = collect ? html : out.join('');
+    report.fetchedBytes = fetchedBytes;
     return report;
   }
 
@@ -549,7 +663,8 @@
     info.slides.forEach(function (s, i) { if (!s.notes) add('info', T((i + 1) + '번 슬라이드(' + s.title + ')에 발표자 노트가 없습니다.', 'Slide ' + (i + 1) + ' (' + s.title + ') has no speaker notes.')); });
     (report && report.external || []).forEach(function (u) {
       var kind = /fonts\.(googleapis|gstatic)|\.woff2?|\.ttf|\.otf/i.test(u) ? T('웹폰트', 'web font') : /\.css(\?|$)/i.test(u) ? T('스타일시트', 'stylesheet') : /\.m?js(\?|$)|cdn/i.test(u) ? T('스크립트', 'script') : T('자원', 'asset');
-      add('warn', T('외부 ' + kind + ' 참조: ' + u + ' — 인터넷이 없는 곳에서는 깨집니다. 로컬 파일로 바꾸세요.', 'External ' + kind + ': ' + u + ' — breaks without internet. Use a local file.'));
+      var hint = isWebFont(u) ? T(' (deckwright build --fetch-fonts 가 파일 안에 넣어 줍니다)', ' (deckwright build --fetch-fonts puts it inside the file)') : T(' 로컬 파일로 바꾸세요.', ' Use a local file.');
+      add('warn', T('외부 ' + kind + ' 참조: ' + u + ' — 인터넷이 없는 곳에서는 깨집니다.', 'External ' + kind + ': ' + u + ' — breaks without internet.') + hint);
     });
     (report && report.missing || []).forEach(function (p) { add('error', T('파일을 찾을 수 없습니다: ', 'File not found: ') + p); });
     (report && report.outside || []).forEach(function (p) { add('error', T('덱 폴더 밖의 파일이라 넣지 않았습니다: ', 'Outside the deck folder, not included: ') + p + T(' (덱 폴더 안으로 옮기세요)', ' (move it into the deck folder)')); });
@@ -565,6 +680,7 @@
     resolvePath: resolvePath, relPath: relPath, isExternal: isExternal,
     inlineHTML: inlineHTML, injectRuntime: injectRuntime, hasRuntime: hasRuntime,
     scan: scan, buildManifest: buildManifest, lint: lint, decodeHTML: decodeHTML,
+    isWebFont: isWebFont, usedChars: usedChars, pruneFontFaces: pruneFontFaces, mergeSameSrcFaces: mergeSameSrcFaces,
     crc32: crc32, writeZip: writeZip, readZip: readZip, findEntry: findEntry, packageToHTML: packageToHTML, LIMITS: LIMITS, own: own
   };
 });

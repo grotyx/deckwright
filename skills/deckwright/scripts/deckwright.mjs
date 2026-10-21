@@ -14,7 +14,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const Core = require(path.join(ROOT, 'core', 'deckwright-core.js'));
 const RUNTIME_PATH = path.join(ROOT, 'runtime', 'deckwright-runtime.js');
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 // Messages follow the system locale (Korean if the locale starts with "ko"); override with DECKWRIGHT_LANG=ko|en
 const LANG = (() => {
@@ -42,7 +42,8 @@ function usage() {
   deckwright runtime [-o 파일.js]             런타임 JS만 꺼내기
 
 <입력>은 HTML 파일, index.html이 있는 폴더, 또는 .hdek 파일입니다.
-덱 폴더 밖의 파일은 넣지 않습니다. 위쪽 폴더의 그림을 쓰는 덱이면 --root <폴더> 로 범위를 넓히세요.`,
+덱 폴더 밖의 파일은 넣지 않습니다. 위쪽 폴더의 그림을 쓰는 덱이면 --root <폴더> 로 범위를 넓히세요.
+--fetch-fonts (build, inject, pack): Google Fonts 같은 웹폰트를 내려받아 파일 안에 넣습니다. 덱에 쓰인 글자에 필요한 조각만 받습니다.`,
 `${C.b}DeckWright ${VERSION}${C.x} — tools for HTML presentation files (.html / .hdek)
 
 Usage:
@@ -56,7 +57,8 @@ Usage:
   deckwright runtime [-o file.js]             Print or save the runtime script
 
 <input> is an HTML file, a folder containing index.html, or a .hdek file.
-Files outside the deck folder are never included. If the deck uses images from a parent folder, widen the scope with --root <dir>.`));
+Files outside the deck folder are never included. If the deck uses images from a parent folder, widen the scope with --root <dir>.
+--fetch-fonts (build, inject, pack): download web fonts such as Google Fonts and put them inside the file. Only the slices needed for the characters in the deck are kept.`));
 }
 
 const NEEDS_VALUE = new Set(['out', 'pdf', 'pptx', 'png', 'root', 'scale', 'wait']);
@@ -87,6 +89,37 @@ function entryHTML(read, entry, report) {
   const d = Core.decodeHTML(read(entry));
   if (d.converted && report) (report.warnings = report.warnings || []).unshift(t(`문자 인코딩 ${d.charset}을(를) UTF-8로 바꿨습니다`, `Converted the text encoding from ${d.charset} to UTF-8`));
   return d;
+}
+// ---------------------------------------------------------------- web fonts (--fetch-fonts)
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'; // Google Fonts serves woff2 to modern browsers
+async function fetchBytes(url) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 30000);
+  try {
+    const r = await fetch(url, { headers: { 'user-agent': UA, accept: '*/*' }, signal: ctl.signal, redirect: 'follow' });
+    if (!r.ok) return null;
+    const b = new Uint8Array(await r.arrayBuffer());
+    return b.length > 50 * 1048576 ? null : b;
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+function fontOpts(a, texts) {
+  if (!a['fetch-fonts']) return {};
+  return { fetch: fetchBytes, chars: Core.usedChars(texts) };
+}
+function printFonts(report) {
+  if (report.fetched && report.fetched.length) {
+    const files = report.fetched.filter((u) => !/\/css2?\?|\.css(?:[?#]|$)/i.test(u)).length;
+    const hosts = [...new Set(report.fetched.map((u) => { try { return new URL(u).host; } catch { return u; } }))].join(', ');
+    console.log(`${C.g}✓${C.x} ${t('웹폰트를 파일 안에 넣음', 'Web fonts embedded')}: ${t(`폰트 ${files}개`, `${files} font files`)}, ${kb(report.fetchedBytes || 0)} ${C.d}(${hosts})${C.x}`);
+  }
+  (report.fetchFailed || []).forEach((u) => console.log(`${C.y}  ! ${t('웹폰트를 받지 못함(인터넷 연결 확인)', 'Could not download web font (check the connection)')}: ${u}${C.x}`));
+}
+/** Replace web-font references in an HTML or CSS text, leaving every local reference as it is */
+async function embedWebFonts(text, kind, pathInDeck, opts) {
+  const src = kind === 'css' ? '<style>' + text + '</style>' : text;
+  const r = await Core.inlineHTML(src, { path: pathInDeck, read: () => null, ...opts });
+  const out = kind === 'css' ? r.html.replace(/^<style>/, '').replace(/<\/style>$/, '') : r.html;
+  return { text: out, report: r };
 }
 const kb = (n) => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : (n / 1024).toFixed(0) + ' KB';
 
@@ -136,7 +169,7 @@ async function buildSingle(inp) {
   const dec = entryHTML(readerFor(inp), inp.entry);
   const html = dec.html;
   let r;
-  try { r = await Core.inlineHTML(html, { path: inp.entry, read: readerFor(inp) }); } catch (e) {
+  try { r = await Core.inlineHTML(html, { path: inp.entry, read: readerFor(inp), ...fontOpts(inp.args || {}, [html]) }); } catch (e) {
     if (e instanceof RangeError) throw new Error(t("자원이 너무 커서 HTML 한 개에 담을 수 없습니다(약 400MB 한도). 'deckwright pack'으로 .hdek 패키지를 만드세요.", "The assets are too large for one HTML file (about 400 MB limit). Use 'deckwright pack' to make a .hdek package."));
     throw e;
   }
@@ -162,11 +195,14 @@ function printReport(report) {
 
 async function cmdBuild(a) {
   const inp = await loadInput(a._[0], a);
+  inp.args = a;
   const { html, report, info } = await buildSingle(inp);
   const out = path.resolve(a.out || defaultOut(inp, '_single.html'));
   if (inp.kind === 'fs' && out === path.resolve(path.join(inp.dir, inp.entry))) throw new Error(t('입력 파일을 덮어쓸 수 없습니다. -o 로 다른 이름을 지정하세요', 'Refusing to overwrite the input. Use -o to pick another name'));
   fs.writeFileSync(out, html);
   console.log(`${C.g}✓${C.x} ${t('단독 HTML', 'Single HTML')}: ${out} ${C.d}(${kb(Buffer.byteLength(html))}, ${t('슬라이드', 'slides')} ${slideCount(info)}, ${t('자원', 'assets')} ${report.used.length})${C.x}`);
+  printFonts(report);
+  if (!a['fetch-fonts']) report.external.filter((u) => Core.isWebFont(u)).length && console.log(`${C.d}  ${t('웹폰트도 파일 안에 넣으려면 --fetch-fonts 를 붙이세요', 'Add --fetch-fonts to put the web fonts inside the file too')}${C.x}`);
   printReport(report);
   if (Buffer.byteLength(html) > 60 * 1048576) console.log(`${C.y}  ! ${t("파일이 큽니다. 영상이 많다면 'deckwright pack'으로 .hdek 패키지를 쓰는 편이 빠릅니다.", "Large file. For video-heavy decks, 'deckwright pack' (.hdek) loads faster.")}${C.x}`);
 }
@@ -175,13 +211,15 @@ async function cmdInject(a) {
   const src = a._[0];
   if (!src || !/\.html?$/i.test(src)) throw new Error(t('HTML 파일을 지정하세요', 'Specify an HTML file'));
   const dec = Core.decodeHTML(new Uint8Array(fs.readFileSync(src)));
-  const html = dec.html;
+  let html = dec.html, fontReport = null;
+  if (a['fetch-fonts']) { const e = await embedWebFonts(html, 'html', path.basename(src), fontOpts(a, [html])); html = e.text; fontReport = e.report; }
   const out = path.resolve(a.out || src.replace(/\.html?$/i, '_DeckWright.html'));
   if (out === path.resolve(src)) throw new Error(t('원본을 덮어쓸 수 없습니다', 'Refusing to overwrite the original'));
   if (path.dirname(out) !== path.dirname(path.resolve(src))) console.log(`${C.y}  ! ${t('출력이 원본과 다른 폴더입니다. 그림·영상 경로가 맞지 않을 수 있습니다.', 'Output is in a different folder from the original; relative image/video paths may break.')}${C.x}`);
   fs.writeFileSync(out, Core.injectRuntime(html, runtimeSrc()));
   console.log(`${C.g}✓${C.x} ${out} ${C.d}(${t('원본과 같은 폴더에서 더블클릭', 'double-click it next to the original')})${C.x}`);
   if (dec.converted) console.log(`${C.y}  ! ${t(`문자 인코딩 ${dec.charset}을(를) UTF-8로 바꿨습니다`, `Converted the text encoding from ${dec.charset} to UTF-8`)}${C.x}`);
+  if (fontReport) printFonts(fontReport);
 }
 
 async function cmdPack(a) {
@@ -199,7 +237,22 @@ async function cmdPack(a) {
     entries = [{ name: inp.entry, bytes: read(inp.entry) }].concat(inside.map((p) => ({ name: p, bytes: read(p) })));
   }
   const entryIdx = entries.findIndex((e) => e.name === inp.entry);
-  const html = Core.injectRuntime(entryHTML(() => entries[entryIdx].bytes, inp.entry, report).html, runtimeSrc());
+  let entryText = entryHTML(() => entries[entryIdx].bytes, inp.entry, report).html;
+  if (a['fetch-fonts']) {
+    // web fonts referenced from the page or its CSS files go into those files as data URLs
+    const fo = fontOpts(a, [entryText]);
+    const all = { fetched: [], fetchFailed: [], fetchedBytes: 0 };
+    const merge = (r) => { r.fetched.forEach((u) => all.fetched.includes(u) || all.fetched.push(u)); r.fetchFailed.forEach((u) => all.fetchFailed.includes(u) || all.fetchFailed.push(u)); all.fetchedBytes += r.fetchedBytes || 0; };
+    const e0 = await embedWebFonts(entryText, 'html', inp.entry, fo); entryText = e0.text; merge(e0.report);
+    for (const e of entries) {
+      if (!/\.css$/i.test(e.name)) continue;
+      const r = await embedWebFonts(Core.utf8Decode(e.bytes), 'css', e.name, fo);
+      if (r.report.fetched.length) { e.bytes = Core.utf8Encode(r.text); merge(r.report); }
+    }
+    report.external = report.external.filter((u) => !all.fetched.includes(u) && !all.fetched.includes('https:' + u));
+    report.fonts = all;
+  }
+  const html = Core.injectRuntime(entryText, runtimeSrc());
   entries[entryIdx] = { name: inp.entry, bytes: Core.utf8Encode(html) };
   const info = Core.scan(html);
   const files = entries.map((e) => ({ path: e.name, size: e.bytes.length, crc32: Core.crc32(e.bytes).toString(16).padStart(8, '0') }));
@@ -210,6 +263,7 @@ async function cmdPack(a) {
   if (inp.kind === 'package' && out === path.resolve(a._[0])) throw new Error(t('입력 파일을 덮어쓸 수 없습니다. -o 로 다른 이름을 지정하세요', 'Refusing to overwrite the input. Use -o to pick another name'));
   fs.writeFileSync(out, zip);
   console.log(`${C.g}✓${C.x} ${t('패키지', 'Package')}: ${out} ${C.d}(${kb(zip.length)}, ${t('파일', 'files')} ${entries.length}, ${t('슬라이드', 'slides')} ${slideCount(info)})${C.x}`);
+  if (report.fonts) printFonts(report.fonts);
   printReport(report);
 }
 

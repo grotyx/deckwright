@@ -4,6 +4,11 @@ English · [한국어](CHANGELOG.ko.md)
 
 Versions follow SemVer. Dates are YYMMDD.
 
+### v0.3.0 (261022)
+
+- `--fetch-fonts` for `build`, `inject` and `pack`: web fonts such as Google Fonts are downloaded once and embedded in the file, so the deck looks the same at a venue without internet. Only the font slices (`unicode-range`) covering characters that appear in the deck are kept, and a variable font listed once per weight is embedded once, so a 31-slide Korean deck with Noto Sans KR in four weights grows by 0.8 MB instead of 4.5 MB (or 18 MB with every weight embedded separately). `preconnect` hints to the font host are dropped. Without the flag, `build` and `check` point to it when they find web fonts.
+- Docs: README, guide and skill instructions describe the option.
+
 ### v0.2.0 (261021)
 
 Fixes from a full code review by three independent reviewers. Every defect below was reproduced first and now has a regression test (87 checks).

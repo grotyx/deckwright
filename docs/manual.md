@@ -1,6 +1,6 @@
 # DeckWright user guide
 
-English · [한국어](manual.ko.md) · v0.2.0
+English · [한국어](manual.ko.md) · v0.3.0
 
 This guide walks through a talk from start to finish: installing, turning an HTML deck into one you can present, presenting with a second screen, writing on slides, and making the files a conference asks for.
 
@@ -124,6 +124,8 @@ Ink drawn in the presenter view appears on the projector and the other way round
 
 `export` needs Playwright and pptxgenjs: `npm i -g playwright pptxgenjs && npx playwright install chromium`. PPTX and PDF exports are backups: they hold the final look of every slide, not the animations.
 
+Web fonts (Google Fonts and the like) need the internet unless you embed them: add `--fetch-fonts` to `build`, `inject` or `pack` while you are online.
+
 Before the talk, run `deckwright check` on the final file. It warns about anything loaded from the internet (web fonts, CDN scripts), files that are missing, and slides without notes.
 
 ## 7. The player and .hdek packages
@@ -148,7 +150,7 @@ Without the player, rename `talk.hdek` to `talk.zip`, extract it and double-clic
 
 **The clicker does nothing.** Click once on the audience or presenter window so it has focus. Most clickers send `PageDown` / `PageUp`, which DeckWright understands.
 
-**The fonts look different at the venue.** The deck loads web fonts from the internet. Run `deckwright check`; then ask your AI to download the fonts into a `fonts/` folder and rebuild.
+**The fonts look different at the venue.** The deck loads web fonts (Google Fonts) from the internet, and the venue has none. Add `--fetch-fonts` when you make the file: `deckwright inject talk.html --fetch-fonts` or `deckwright build talk/ --fetch-fonts`. The fonts are downloaded once, on your connected laptop, and embedded; only the slices for the characters in the deck are kept. From the chat, say "put the fonts inside the file".
 
 **Slides advance twice, or a step is skipped.** The deck has its own key handler that DeckWright did not recognize. Open an issue with the deck (or a trimmed copy) at <https://github.com/grotyx/deckwright/issues>.
 
