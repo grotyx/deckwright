@@ -14,7 +14,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const Core = require(path.join(ROOT, 'core', 'deckwright-core.js'));
 const RUNTIME_PATH = path.join(ROOT, 'runtime', 'deckwright-runtime.js');
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 
 // Messages follow the system locale (Korean if the locale starts with "ko"); override with DECKWRIGHT_LANG=ko|en
 const LANG = (() => {

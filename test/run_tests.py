@@ -66,6 +66,12 @@ with sync_playwright() as pw:
     check('advancing in presenter moves audience', st()['step'] == 2, st())
     pp.click('button[data-act="list"]'); pp.click('#list li >> nth=1'); pp.wait_for_timeout(300)
     check('pick slide from list', st()['slide'] == 1, st())
+    b0 = st(); pp.click('#curbox'); pp.wait_for_timeout(300)
+    check('click on the presenter preview advances', st()['step'] == b0['step'] + 1 or st()['slide'] == b0['slide'] + 1, (b0, st()))
+    b1 = st(); pp.click('#notes'); pp.wait_for_timeout(300)
+    check('click on the notes does not advance', st() == b1, (b1, st()))
+    pp.mouse.move(*[v + 20 for v in (pp.locator('#curbox').bounding_box()['x'], pp.locator('#curbox').bounding_box()['y'])]); pp.mouse.wheel(0, -120); pp.wait_for_timeout(300)
+    check('wheel up over the preview goes back', st() == b0, (b0, st()))
     # ink drawn in the presenter view is stored on the audience side
     pp.click('button[data-act="pen"]')
     box = pp.locator('#curbox').bounding_box()

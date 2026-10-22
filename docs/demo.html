@@ -169,7 +169,7 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
 </script>
 
 <script data-hdek-runtime>
-/*! DeckWright runtime v0.3.0 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright runtime v0.3.1 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -178,7 +178,7 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
   var PRODUCT = 'DeckWright';
-  var VERSION = '0.3.0';
+  var VERSION = '0.3.1';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 
@@ -1488,6 +1488,7 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
       w.addEventListener('resize', layout);
       w.addEventListener('beforeunload', function () { w = null; });
       doc.addEventListener('click', onClick);
+      doc.addEventListener('wheel', onWheel, { passive: false });
       doc.getElementById('notesminus').addEventListener('click', function () { setNotes(-2); });
       doc.getElementById('notesplus').addEventListener('click', function () { setNotes(2); });
       els.dur.addEventListener('change', function () { D.duration = parseFloat(els.dur.value) || 0; tickTimer(); els.dur.blur(); });
@@ -1624,6 +1625,21 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
         return;
       }
       if (t.closest && t.closest('#list') && t.id === 'list') els.list.classList.remove('on');
+      // Clicking either slide preview advances, as in PowerPoint's presenter view (not while a pen tool is on)
+      if (!D.tool && e.button === 0 && Date.now() >= inkClickBlock && t.closest && t.closest('#curbox, #nxtbox')) next();
+    }
+
+    // Wheel over the slide previews moves back and forth; the notes keep scrolling normally
+    function onWheel(e) {
+      var t = e.target;
+      if (!t.closest || !t.closest('#cur, #nxt') || e.ctrlKey) return;
+      e.preventDefault();
+      var now = Date.now();
+      if (now < wheelLock) { wheelLock = Math.max(wheelLock, now + 180); return; }
+      wheelAcc += e.deltaY;
+      if (Math.abs(wheelAcc) < 30) return;
+      if (wheelAcc > 0) next(); else prev();
+      wheelAcc = 0; wheelLock = now + 450;
     }
 
     function setNotes(d) {
@@ -1699,7 +1715,8 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
     '.pane{position:relative;min-height:0;display:grid;place-items:center}',
     '#cur{background:#08080a;border-radius:10px}',
     '.box{position:relative;overflow:hidden;background:#000;border-radius:6px;box-shadow:0 0 0 1px #2a2a31}',
-    '#curbox{box-shadow:0 0 0 2px #0a84ff55}',
+    '#curbox{box-shadow:0 0 0 2px #0a84ff55;cursor:pointer}',
+    '#nxtbox{cursor:pointer}',
     '.box iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;pointer-events:none;background:#000}',
     '.pink{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;touch-action:none}',
     '.pink.active{pointer-events:auto;cursor:crosshair}',

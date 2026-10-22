@@ -4,6 +4,10 @@ English · [한국어](CHANGELOG.ko.md)
 
 Versions follow SemVer. Dates are YYMMDD.
 
+### v0.3.1 (261022)
+
+- Presenter view: clicking the current or next slide preview advances, and the wheel over the previews moves back and forth, as in the audience window. Clicks and scrolling in the notes do nothing to the slides. Not while a pen tool is on.
+
 ### v0.3.0 (261022)
 
 - `--fetch-fonts` for `build`, `inject` and `pack`: web fonts such as Google Fonts are downloaded once and embedded in the file, so the deck looks the same at a venue without internet. Only the font slices (`unicode-range`) covering characters that appear in the deck are kept, and a variable font listed once per weight is embedded once, so a 31-slide Korean deck with Noto Sans KR in four weights grows by 0.8 MB instead of 4.5 MB (or 18 MB with every weight embedded separately). `preconnect` hints to the font host are dropped. Without the flag, `build` and `check` point to it when they find web fonts.

@@ -9,7 +9,7 @@
       "name": "deckwright",
       "source": "./",
       "description": "Make HTML slide decks that present like PowerPoint (click steps, presenter view, notes, timer, pen, print), or make an existing AI-made HTML deck presentable.",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "author": { "name": "Sang-Min Park" },
       "license": "MIT",
       "category": "productivity"
