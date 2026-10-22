@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.3.1-111111?style=flat-square" alt="Version 0.3.1">
+  <img src="https://img.shields.io/badge/version-0.3.2-111111?style=flat-square" alt="Version 0.3.2">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -58,7 +58,7 @@ $ deckwright inject talk.html
 ✓ talk_DeckWright.html (double-click it next to the original)
 ```
 
-새 파일을 더블클릭하고 `S` 를 누른 뒤, 청중 창을 프로젝터 쪽으로 끌어다 놓고 그 창에서 `F` 를 누른다. 노트북에는 현재 화면, 다음 단계, 노트, 시계가 보이고 프로젝터에는 슬라이드만 나간다. 원본 `talk.html` 은 그대로다.
+새 파일을 더블클릭하고 `S` 를 누른다. Chrome·Edge 에서 프로젝터가 *확장* 모드로 연결되어 있으면, 그 한 번으로 슬라이드는 프로젝터에 전체화면으로, 발표자 창은 노트북 화면에 가득 열린다(처음 한 번 "창 관리" 권한을 묻는다). 다른 브라우저에서는 슬라이드 창을 프로젝터 쪽으로 끌어다 놓고 그 창에서 `F` 를 누른다. 노트북에는 현재 화면, 다음 단계, 노트, 시계가 보이고 프로젝터에는 슬라이드만 나간다. 원본 `talk.html` 은 그대로다.
 
 ## 동작 방식
 
@@ -181,7 +181,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 ## 알려진 한계
 
-- `F` 로 전체화면 창을 보조 모니터로 자동으로 옮기는 기능은 Chrome/Edge의 Window Management API를 쓰고 처음에 권한을 한 번 묻는다. 안 되면 창을 끌어다 놓고 `F`.
+- 슬라이드를 프로젝터로 저절로 보내는 기능(`S`, `F`)은 Chrome·Edge의 Window Management API를 쓰며 처음에 권한을 한 번 묻는다. Firefox·Safari에는 이 기능이 없어 슬라이드 창을 끌어다 놓고 `F` 를 누른다.
 - 발표자 창 미리보기는 덱을 두 번 더 띄운다. 아주 무거운 덱이면 *미리보기* 버튼으로 실시간 미리보기를 끈다.
 - 영상 재생 위치는 프로젝터와 미리보기 사이에 맞추지 않는다(미리보기 영상은 음소거).
 - 덱이 자체 `setTimeout` 으로 돌리는 애니메이션은 뒤로 갈 때 바로 끝낼 수 없다. 규약의 `setStep` 훅을 쓰면 된다.

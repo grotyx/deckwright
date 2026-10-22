@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.3.1-111111?style=flat-square" alt="Version 0.3.1">
+  <img src="https://img.shields.io/badge/version-0.3.2-111111?style=flat-square" alt="Version 0.3.2">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -58,7 +58,7 @@ $ deckwright inject talk.html
 ✓ talk_DeckWright.html (double-click it next to the original)
 ```
 
-Double-click the new file, press `S`, drag the audience window to the projector and press `F` there. Your laptop shows the current slide, the next step, your notes and the clock. The projector shows only the slides. The original `talk.html` is not touched.
+Double-click the new file and press `S`. In Chrome or Edge with the projector set to *Extend*, the slides go fullscreen on the projector and the presenter view fills the laptop, in that one key press (the browser asks once for "window management"). Elsewhere, drag the slide window to the projector and press `F` there. Your laptop shows the current slide, the next step, your notes and the clock. The projector shows only the slides. The original `talk.html` is not touched.
 
 ## How it works
 
@@ -182,7 +182,7 @@ Effects, JS hooks for counters and charts, events, the `.hdek` format and how ot
 
 ## Known limits
 
-- Moving the fullscreen window to the second screen by itself (`F`) uses Chrome/Edge's Window Management API and asks permission once; if it does not, drag the window over and press `F`.
+- Putting the slides on the projector by themselves (`S`, `F`) uses Chrome/Edge's Window Management API, which asks permission once; Firefox and Safari do not have it, so there you drag the slide window over and press `F`.
 - The presenter previews load the deck twice more. On a very heavy deck, turn the live preview off with the *Preview* button.
 - Video position is not synced between the projector and the previews (preview video is muted).
 - An animation the deck runs with its own `setTimeout` cannot be finished instantly when going back; the contract's `setStep` hook can.

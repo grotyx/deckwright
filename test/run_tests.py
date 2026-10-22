@@ -248,6 +248,26 @@ with sync_playwright() as pw:
     pp.keyboard.press('PageDown'); pp.wait_for_timeout(300)
     check('clicker (PageDown) works while a text box has focus', pg.evaluate('JSON.stringify(DeckWright.state())') != a0)
     ctx.close()
+    # S with two screens (mocked): slides fullscreen on the projector + presenter popup on the laptop, one key press
+    MOCK = """(() => {
+      const laptop = {availLeft:0, availTop:0, availWidth:1440, availHeight:860, isInternal:true, label:'laptop'};
+      const proj = {availLeft:1440, availTop:0, availWidth:1920, availHeight:1080, isInternal:false, label:'projector'};
+      Object.defineProperty(window.screen, 'isExtended', {get: () => true});
+      window.getScreenDetails = () => Promise.resolve({screens:[laptop, proj], currentScreen: laptop});
+      const q = navigator.permissions.query.bind(navigator.permissions);
+      navigator.permissions.query = (d) => d && d.name === 'window-management' ? Promise.resolve({state:'granted'}) : q(d);
+      window.__calls = [];
+      Element.prototype.requestFullscreen = function (o) { window.__calls.push(['fullscreen', o && o.screen && o.screen.label]); return Promise.resolve(); };
+      const open = window.open.bind(window);
+      window.open = function (u, n, f) { window.__calls.push(['open', f]); return open(u, n, f); };
+    })();"""
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); ctx.add_init_script(MOCK); pg = ctx.new_page()
+    pg.goto(url(os.path.join(DIST, 'demo.html'))); pg.wait_for_timeout(600)
+    with ctx.expect_page() as pi: pg.keyboard.press('s')
+    pi.value.wait_for_timeout(500)
+    calls = pg.evaluate('window.__calls')
+    check('S: slides fullscreen on the projector and presenter on the laptop in one press', calls[:2] == [['fullscreen', 'projector'], ['open', 'popup=yes,left=0,top=0,width=1440,height=860']], calls)
+    ctx.close()
     # a frame inside a slide cannot drive the presenter (here: clear all ink)
     ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
     pg.goto(url(built('embed-post'))); pg.wait_for_timeout(500)

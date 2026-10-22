@@ -1,4 +1,4 @@
-/*! DeckWright runtime v0.3.1 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright runtime v0.3.2 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -7,7 +7,7 @@
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
   var PRODUCT = 'DeckWright';
-  var VERSION = '0.3.1';
+  var VERSION = '0.3.2';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 
@@ -990,6 +990,49 @@
   }
 
   // ------------------------------------------------------------------ fullscreen / projector
+  // Screens (Window Management API, Chrome/Edge). Cached once the user has allowed it, because fullscreen on
+  // another screen and the presenter popup must both start inside the same key press.
+  var screens = null;
+  function loadScreens(ask) {
+    if (!('getScreenDetails' in window)) return Promise.resolve(null);
+    var get = function () { return window.getScreenDetails().then(function (sd) { screens = sd; return sd; }); };
+    if (ask) return get().catch(function () { return null; });
+    try {
+      return navigator.permissions.query({ name: 'window-management' }).then(function (st) { return st.state === 'granted' ? get() : null; }).catch(function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
+  }
+  function projectorOf(sd) {
+    if (!sd) return null;
+    var cur = sd.currentScreen;
+    return sd.screens.filter(function (x) { return x !== cur; }).sort(function (a, b) { return (a.isInternal ? 1 : 0) - (b.isInternal ? 1 : 0); })[0] || null;
+  }
+  function isFull() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+
+  // S: presenter view on this screen and the slides fullscreen on the projector, in one key press
+  function startPresenting() {
+    if (ROLE !== 'audience') return;
+    if (Presenter.isOpen()) { Presenter.open(); return; }
+    var extended = !!(window.screen && window.screen.isExtended);
+    var target = extended ? projectorOf(screens) : null;
+    var el = document.documentElement;
+    if (target && !isFull() && el.requestFullscreen) {
+      var here = screens.currentScreen;
+      // Chrome lets a page go fullscreen on another screen and open a "companion" popup from one gesture
+      try { var r = el.requestFullscreen({ screen: target }); if (r && r.catch) r.catch(function () { }); } catch (e) { }
+      Presenter.open(here, true);
+      return;
+    }
+    Presenter.open();
+    if (extended && !screens && 'getScreenDetails' in window) {
+      // first time: ask for the "window management" permission; from then on S does both at once
+      loadScreens(true).then(function (sd) {
+        if (sd) toast(T('허용되었습니다. 지금은 청중 창에서 F를 누르세요. 다음부터는 S 한 번으로 프로젝터 전체화면까지 됩니다', 'Allowed. Press F in the audience window now; next time S also puts the slides fullscreen on the projector'), 6000);
+      });
+    } else if (window.screen && window.screen.isExtended === false && 'getScreenDetails' in window) {
+      toast(T('화면이 하나이거나 복제 모드입니다. 프로젝터를 "확장" 모드로 연결하세요 (Windows: Win+P)', 'One screen, or the displays are mirrored. Set the projector to "Extend" (Windows: Win+P)'), 6000);
+    }
+  }
+
   function toggleFullscreen() {
     var doc = document;
     if (doc.fullscreenElement || doc.webkitFullscreenElement) {
@@ -1003,14 +1046,15 @@
       try { var r = req.call(el); if (r && r.catch) r.catch(function () { toast(T('한 번 더 F를 눌러 주세요', 'Press F once more')); }); } catch (e) { }
     };
     if (!('getScreenDetails' in window) || !(window.screen && window.screen.isExtended)) { plain(); return; }
-    window.getScreenDetails().then(function (sd) {
-      var cur = sd.currentScreen;
-      var target = sd.screens.filter(function (s) { return s !== cur; }).sort(function (a, b) { return (a.isInternal ? 1 : 0) - (b.isInternal ? 1 : 0); })[0];
+    var go2 = function (sd) {
+      var target = projectorOf(sd);
       if (!target) { plain(); return; }
       var r = req.call(el, { screen: target });
       if (r && r.catch) r.catch(plain);
       toast(T('프로젝터 화면에 전체화면으로 표시합니다', 'Showing fullscreen on the projector'));
-    }).catch(plain);
+    };
+    if (screens) { go2(screens); return; } // already allowed: stay inside the key press
+    loadScreens(true).then(function (sd) { if (sd) go2(sd); else plain(); });
   }
 
   // ------------------------------------------------------------------ input
@@ -1029,7 +1073,7 @@
       case 'clearall': clearInk(true); break;
       case 'blank': setBlank('black'); break;
       case 'white': setBlank('white'); break;
-      case 'presenter': Presenter.open(); break;
+      case 'presenter': startPresenting(); break;
       case 'full': toggleFullscreen(); break;
       case 'help': if (helpEl) helpEl.classList.toggle('on'); break;
       case 'print': window.print(); break;
@@ -1274,16 +1318,18 @@
       return { w: window.innerWidth || 1280, h: window.innerHeight || 720 };
     }
 
-    function open() {
+    function open(onScreen, withShow) {
       if (ROLE !== 'audience') return;
       if (w && !w.closed) { try { w.focus(); } catch (e) { } return; }
       var feat = 'popup=yes,width=1280,height=800';
+      // put the presenter view on the laptop screen, filling it, while the slides go to the projector
+      if (onScreen) feat = 'popup=yes,left=' + onScreen.availLeft + ',top=' + onScreen.availTop + ',width=' + onScreen.availWidth + ',height=' + onScreen.availHeight;
       w = window.open('', 'hdek-presenter', feat);
       if (!w) { toast(T('팝업이 차단되었습니다. 주소창의 팝업 허용 후 다시 S를 눌러 주세요', 'Popup blocked. Allow popups in the address bar, then press S again'), 4000); return; }
       try { w.document; } catch (e) { toast(T('발표자 창을 열 수 없습니다 (보안 설정)', 'Cannot open the presenter view (security settings)')); w = null; return; }
       build();
       if (!timer.running && !timer.acc) startTimer();
-      toast(T('발표자 창을 열었습니다. 이 창을 프로젝터로 옮기고 F를 누르세요', 'Presenter view opened. Move this window to the projector and press F'), 3200);
+      if (!withShow) toast(T('발표자 창을 열었습니다. 이 창을 프로젝터로 옮기고 F를 누르세요', 'Presenter view opened. Move this window to the projector and press F'), 3200);
     }
 
     function close() { try { if (w && !w.closed) w.close(); } catch (e) { } w = null; }
@@ -1687,6 +1733,7 @@
     setupUI();
     setupInk();
     bindInput();
+    loadScreens(false);
     fit();
     afterChange(true);
     document.documentElement.setAttribute('data-hdek-mode', D.mode);

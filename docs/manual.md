@@ -1,6 +1,6 @@
 # DeckWright user guide
 
-English · [한국어](manual.ko.md) · v0.3.1
+English · [한국어](manual.ko.md) · v0.3.2
 
 This guide walks through a talk from start to finish: installing, turning an HTML deck into one you can present, presenting with a second screen, writing on slides, and making the files a conference asks for.
 
@@ -75,8 +75,9 @@ The skill writes the deck to the DeckWright contract, checks it and builds one f
 
 Open the file in Chrome, Edge, Firefox or Safari.
 
-1. Press `S`. The presenter view opens in a new window.
-2. Drag the audience window (the one with the slide) to the projector and press `F` there. In Chrome and Edge `F` can move it to the second screen by itself after asking permission once.
+1. Connect the projector in *Extend* mode (Windows: `Win+P` → Extend; Mac: turn mirroring off).
+2. Press `S`. In Chrome or Edge the slides go fullscreen on the projector and the presenter view fills the laptop screen, both from that one key press. The first time, the browser asks to allow "window management": allow it, press `F` once in the slide window, and from then on `S` alone does everything.
+   In Firefox or Safari, `S` opens the presenter view only: drag the slide window to the projector and press `F` there.
 3. Present from the laptop. Arrow keys, a clicker, a click or the wheel all work, in either window. In the presenter view, click either slide preview to advance or turn the wheel over them; clicks in the notes do nothing, so you can scroll and select there.
 
 ![Presenter view](images/en/presenter.png)

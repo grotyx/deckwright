@@ -4,6 +4,10 @@ English · [한국어](CHANGELOG.ko.md)
 
 Versions follow SemVer. Dates are YYMMDD.
 
+### v0.3.2 (261022)
+
+- `S` now starts the whole show in Chrome and Edge: with the projector connected in *Extend* mode, the slides go fullscreen on the projector and the presenter view opens filling the laptop screen, from that one key press. The browser asks once for "window management"; until it is allowed, `S` opens the presenter view and `F` puts the slides on the projector as before. With one screen or mirrored displays, `S` says to switch the projector to Extend. Firefox and Safari keep the two-step way.
+
 ### v0.3.1 (261022)
 
 - Presenter view: clicking the current or next slide preview advances, and the wheel over the previews moves back and forth, as in the audience window. Clicks and scrolling in the notes do nothing to the slides. Not while a pen tool is on.
