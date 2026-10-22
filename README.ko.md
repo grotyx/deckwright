@@ -191,7 +191,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 [사용 설명서](docs/manual.ko.md) &middot; [규약 (hdek/1)](SPEC.ko.md) &middot; [스킬 지시문](skills/deckwright/SKILL.md) &middot; [변경 내역](CHANGELOG.ko.md)
 
-개발: `npm run build` 로 플레이어·데모·스킬 zip을 다시 만들고, `npm test` 로 Chromium·명령줄 검사 97개를 돌린다. 코드 리뷰에서 찾은 결함마다 회귀 테스트가 들어 있다(Python용 Playwright, `pdfplumber`, `python-pptx` 필요).
+개발: `npm run build` 로 플레이어·데모·스킬 zip을 다시 만들고, `npm test` 로 Chromium·명령줄 검사 98개를 돌린다. 코드 리뷰에서 찾은 결함마다 회귀 테스트가 들어 있다(Python용 Playwright, `pdfplumber`, `python-pptx` 필요).
 
 ## 저자
 

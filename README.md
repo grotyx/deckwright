@@ -192,7 +192,7 @@ Effects, JS hooks for counters and charts, events, the `.hdek` format and how ot
 
 [User guide](docs/manual.md) &middot; [Spec (hdek/1)](SPEC.md) &middot; [Skill instructions](skills/deckwright/SKILL.md) &middot; [Changelog](CHANGELOG.md)
 
-Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 97 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
+Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 98 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
 
 ## Author
 
