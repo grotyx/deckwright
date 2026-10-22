@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.3.2-111111?style=flat-square" alt="Version 0.3.2">
+  <img src="https://img.shields.io/badge/version-0.3.3-111111?style=flat-square" alt="Version 0.3.3">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -124,7 +124,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 | 동작 | 키 |
 |---|---|
-| 다음 / 이전 | `→` `Space` `PageDown` 클릭 휠 / `←` `PageUp` |
+| 다음 / 이전 | `→` `Space` `PageDown`, 아무 데나 클릭, 휠 내리기 / `←` `PageUp`, 오른쪽 클릭, 휠 올리기 |
 | *n* 번 슬라이드로 | 숫자 *n* 입력 후 `Enter` |
 | 발표자 창 | `S` |
 | 프로젝터 전체화면 | `F` (클리커의 `F5`) |
@@ -191,7 +191,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 [사용 설명서](docs/manual.ko.md) &middot; [규약 (hdek/1)](SPEC.ko.md) &middot; [스킬 지시문](skills/deckwright/SKILL.md) &middot; [변경 내역](CHANGELOG.ko.md)
 
-개발: `npm run build` 로 플레이어·데모·스킬 zip을 다시 만들고, `npm test` 로 Chromium·명령줄 검사 98개를 돌린다. 코드 리뷰에서 찾은 결함마다 회귀 테스트가 들어 있다(Python용 Playwright, `pdfplumber`, `python-pptx` 필요).
+개발: `npm run build` 로 플레이어·데모·스킬 zip을 다시 만들고, `npm test` 로 Chromium·명령줄 검사 100개를 돌린다. 코드 리뷰에서 찾은 결함마다 회귀 테스트가 들어 있다(Python용 Playwright, `pdfplumber`, `python-pptx` 필요).
 
 ## 저자
 

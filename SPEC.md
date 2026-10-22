@@ -124,8 +124,8 @@ Readers must treat a package as untrusted input: entry names that leave the pack
 
 | Action | Keys / input |
 |---|---|
-| Next | `→` `↓` `Space` `PageDown` `Enter` `N`, click on empty space, wheel down, touch swipe |
-| Previous | `←` `↑` `PageUp` `Backspace` `P`, wheel up |
+| Next | `→` `↓` `Space` `PageDown` `Enter` `N`, a click anywhere on the slide (also on the presenter's previews), wheel down, touch swipe |
+| Previous | `←` `↑` `PageUp` `Backspace` `P`, right-click, wheel up |
 | First / last / slide n | `Home` / `End` / type a number, then `Enter` |
 | Presenter view | `S` |
 | Fullscreen (on the second screen when there is one) | `F` (a clicker's `F5` does the same) |

@@ -1,6 +1,6 @@
 # DeckWright 사용 설명서
 
-[English](manual.md) · 한국어 · v0.3.2
+[English](manual.md) · 한국어 · v0.3.3
 
 발표 하나를 처음부터 끝까지 따라간다. 설치하고, HTML 덱을 발표할 수 있게 만들고, 두 화면으로 발표하고, 슬라이드에 필기하고, 학회가 요구하는 파일을 만드는 순서다.
 
@@ -88,7 +88,7 @@ Chrome, Edge, Firefox, Safari 중 하나로 파일을 연다.
 
 | 동작 | 키 |
 |---|---|
-| 다음 / 이전 | `→` `↓` `Space` `PageDown` `Enter`, 클릭, 휠 아래 / `←` `↑` `PageUp` `Backspace`, 휠 위 |
+| 다음 / 이전 | `→` `↓` `Space` `PageDown` `Enter`, 슬라이드 아무 데나 클릭, 휠 내리기 / `←` `↑` `PageUp` `Backspace`, 오른쪽 클릭, 휠 올리기 |
 | 처음 / 끝 / *n* 번 | `Home` / `End` / *n* 입력 후 `Enter` |
 | 발표자 창 | `S` |
 | 전체화면 | `F` (클리커의 `F5` 도 같다) |

@@ -223,6 +223,18 @@ with sync_playwright() as pw:
     s1 = pg.evaluate('DeckWright.state()'); s0 = json.loads(s0)
     check('one trackpad fling advances once', (s1['slide'] * 10 + s1['step']) - (s0['slide'] * 10 + s0['step']) in (1, 10 - s0['step']), (s0, s1))
     ctx.close()
+    # a deck that goes back when its left third is clicked: any click moves forward, right-click and wheel-up go back
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(built('zone-engine'))); pg.wait_for_function('window.DeckWright && DeckWright.state().count>1')
+    zs = lambda: pg.evaluate('[DeckWright.state().slide, DeckWright.state().step]')
+    pg.mouse.click(1000, 360); pg.wait_for_timeout(400); a1 = zs()
+    pg.mouse.click(150, 360); pg.wait_for_timeout(400); a2 = zs()
+    pg.mouse.click(640, 360, button='right'); pg.wait_for_timeout(400); a3 = zs()
+    pg.mouse.move(640, 360); pg.mouse.wheel(0, 120); pg.wait_for_timeout(600); a4 = zs()
+    pg.mouse.wheel(0, -120); pg.wait_for_timeout(600); a5 = zs()
+    check('click anywhere goes forward (even the left side of a deck that would go back)', a1 == [0, 1] and a2 == [0, 2], (a1, a2))
+    check('right-click and wheel-up go back, wheel-down forward', a3 == [0, 1] and a4 == [0, 2] and a5 == [0, 1], (a3, a4, a5))
+    ctx.close()
     # deck CSS must not reach the runtime UI
     ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
     pg.goto(url(os.path.join(DIST, 'demo.html'))); pg.wait_for_timeout(400)

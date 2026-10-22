@@ -1,6 +1,6 @@
 # DeckWright user guide
 
-English · [한국어](manual.ko.md) · v0.3.2
+English · [한국어](manual.ko.md) · v0.3.3
 
 This guide walks through a talk from start to finish: installing, turning an HTML deck into one you can present, presenting with a second screen, writing on slides, and making the files a conference asks for.
 
@@ -88,7 +88,7 @@ The presenter view shows the current slide, the next step (or the next slide), y
 
 | Action | Keys |
 |---|---|
-| Next / previous | `→` `↓` `Space` `PageDown` `Enter`, click, wheel down / `←` `↑` `PageUp` `Backspace`, wheel up |
+| Next / previous | `→` `↓` `Space` `PageDown` `Enter`, click anywhere on the slide, wheel down / `←` `↑` `PageUp` `Backspace`, right-click, wheel up |
 | First / last / slide *n* | `Home` / `End` / *n* then `Enter` |
 | Presenter view | `S` |
 | Fullscreen | `F` (a clicker's `F5` does the same) |

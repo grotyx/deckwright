@@ -169,7 +169,7 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
 </script>
 
 <script data-hdek-runtime>
-/*! DeckWright runtime v0.3.2 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright runtime v0.3.3 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -178,7 +178,7 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
   var PRODUCT = 'DeckWright';
-  var VERSION = '0.3.2';
+  var VERSION = '0.3.3';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 
@@ -1139,7 +1139,7 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
 
   function helpHTML() {
     var rows = [
-      [T('다음 / 이전', 'Next / previous'), T('<kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd> 클릭·휠 / <kbd>←</kbd><kbd>PgUp</kbd><kbd>P</kbd>', '<kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd> click · wheel / <kbd>←</kbd><kbd>PgUp</kbd><kbd>P</kbd>')],
+      [T('다음 / 이전', 'Next / previous'), T('<kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd> 클릭·휠↓ / <kbd>←</kbd><kbd>PgUp</kbd> 오른쪽 클릭·휠↑', '<kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd> click · wheel ↓ / <kbd>←</kbd><kbd>PgUp</kbd> right-click · wheel ↑')],
       [T('처음 / 끝 · 이동', 'First / last · go to'), T('<kbd>Home</kbd> <kbd>End</kbd> · 숫자 + <kbd>Enter</kbd>', '<kbd>Home</kbd> <kbd>End</kbd> · number + <kbd>Enter</kbd>')],
       [T('발표자 창', 'Presenter view'), '<kbd>S</kbd>'],
       [T('전체화면 · 프로젝터로', 'Fullscreen · to projector'), '<kbd>F</kbd>'],
@@ -1348,8 +1348,9 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
   var wheelLock = 0, wheelAcc = 0, inkClickBlock = 0;
   function bindInput() {
     window.addEventListener('keydown', handleKey, true);
-    // Capture phase: when we advance, the deck's own click handler must not advance as well.
-    // Driver decks are the exception: their engine goes first and we only fill in.
+    // Capture phase: a click anywhere on the slide moves forward, and the deck's own click handler must not
+    // also act (many AI decks go back when the left third is clicked; in a talk a click should always advance).
+    // Buttons, links and other interactive elements keep working as the deck intended.
     window.addEventListener('click', function (e) {
       if (Date.now() < inkClickBlock) { e.stopImmediatePropagation(); e.preventDefault(); return; } // the click that ends a pen stroke
       if (!D.clickAdvance || D.tool || e.button !== 0) return;
@@ -1358,9 +1359,16 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
       if (isInteractive(e.target, s && s.el)) return;
       var sel = window.getSelection && window.getSelection();
       if (sel && String(sel).length > 0) return;
-      if (D.mode === 'driver') { afterDeck(next); return; }
       e.stopImmediatePropagation();
       next();
+    }, true);
+    // Right-click goes back (the browser menu is not shown on the slides)
+    window.addEventListener('contextmenu', function (e) {
+      if (!D.clickAdvance || D.tool || D.mode === 'single') return;
+      if (isTyping(e.target) || (e.target && e.target.closest && e.target.closest('.hdek-ui, a, input, textarea, select, [contenteditable]'))) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      prev();
     }, true);
     window.addEventListener('wheel', function (e) {
       if (!D.wheelAdvance || e.ctrlKey || D.mode === 'single') return;
@@ -1371,7 +1379,7 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
         el = el.parentElement;
       }
       e.preventDefault();
-      if (D.mode !== 'driver' && D.mode !== 'reveal') e.stopImmediatePropagation();
+      if (D.mode !== 'reveal') e.stopImmediatePropagation(); // one wheel step = one move, even if the deck listens too
       var now = Date.now();
       // trackpad momentum keeps sending events: one swipe = one step, so wait for a quiet gap
       if (now < wheelLock) { wheelLock = Math.max(wheelLock, now + 180); return; }
@@ -1535,6 +1543,12 @@ Going back, numbers and bars jump straight to that state. This shows how JS-driv
       w.addEventListener('beforeunload', function () { w = null; });
       doc.addEventListener('click', onClick);
       doc.addEventListener('wheel', onWheel, { passive: false });
+      doc.addEventListener('contextmenu', function (e) {
+        var t = e.target;
+        if (D.tool || !t.closest || !t.closest('#cur, #nxt')) return;
+        e.preventDefault();
+        prev();
+      });
       doc.getElementById('notesminus').addEventListener('click', function () { setNotes(-2); });
       doc.getElementById('notesplus').addEventListener('click', function () { setNotes(2); });
       els.dur.addEventListener('change', function () { D.duration = parseFloat(els.dur.value) || 0; tickTimer(); els.dur.blur(); });

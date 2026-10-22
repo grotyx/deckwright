@@ -4,6 +4,10 @@ English · [한국어](CHANGELOG.ko.md)
 
 Versions follow SemVer. Dates are YYMMDD.
 
+### v0.3.3 (261022)
+
+- A click anywhere on the slide moves forward, also in decks that have their own "left side = back" click zones. Right-click and wheel-up go back (wheel-down forward), in the audience window and on the presenter's previews. Buttons and links in the deck keep working.
+
 ### v0.3.2 (261022)
 
 - `S` now starts the whole show in Chrome and Edge: with the projector connected in *Extend* mode, the slides go fullscreen on the projector and the presenter view opens filling the laptop screen, from that one key press. The browser asks once for "window management"; until it is allowed, `S` opens the presenter view and `F` puts the slides on the projector as before. With one screen or mirrored displays, `S` says to switch the projector to Extend. Firefox and Safari keep the two-step way.
