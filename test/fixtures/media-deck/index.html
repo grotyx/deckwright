@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Media deck</title>
+<style>
+  body{margin:0;background:#111;color:#eee;font:48px system-ui}
+  section{padding:80px;box-sizing:border-box}
+  .tbl{position:absolute;left:1200px;top:700px;width:500px;height:200px;background:#2a6;font-size:28px}
+</style></head>
+<body>
+<main data-hdek data-width="1920" data-height="1080">
+  <section data-slide="intro"><h1>Opening slide</h1><aside class="notes">Welcome everyone.</aside></section>
+  <section data-slide="video"><h2>Surgical video</h2><video src="clip.webm" style="width:960px;height:540px"></video><aside class="notes">Play the clip from the presenter view.</aside></section>
+  <section data-slide="table"><h2>Outcome table</h2><p data-step>First finding</p><div class="tbl" data-step>Small table: ODI 12.4 vs 15.1</div><aside class="notes">Zoom into the table during Q&amp;A.</aside></section>
+  <section data-slide="pelvis"><h2>Spinopelvic parameters</h2><p>Pelvic incidence and lumbar lordosis mismatch</p><aside class="notes">PI-LL mismatch above 10 degrees.</aside></section>
+  <section data-slide="end"><h2>Thank you</h2></section>
+</main>
+<script src="../../../skills/deckwright/runtime/deckwright-runtime.js" data-hdek-runtime></script>
+</body></html>

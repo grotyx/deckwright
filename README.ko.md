@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.3.3-111111?style=flat-square" alt="Version 0.3.3">
+  <img src="https://img.shields.io/badge/version-0.3.4-111111?style=flat-square" alt="Version 0.3.4">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -63,7 +63,7 @@ $ deckwright inject talk.html
 ## 동작 방식
 
 ```text
- talk.html  +  런타임 (파일 안, 약 85KB, 네트워크 없음)
+ talk.html  +  런타임 (파일 안, 약 130KB, 네트워크 없음)
       │
       ├─▶ 청중 창: 슬라이드만, 프로젝터에
       └─▶ 발표자 창: 현재 · 다음 · 노트 · 타이머 · 펜, 노트북에
@@ -81,6 +81,8 @@ $ deckwright inject talk.html
 | 클리커가 먹힌다 | 방향키, PageUp/PageDown, F5, 검은 화면 버튼, 휠, 클릭 |
 | 와이파이가 없어도 깨지지 않는다 | `build` 가 모든 자원을 파일 안에 넣는다. `--fetch-fonts` 는 Google Fonts 같은 웹폰트까지 내려받아 넣는다. 아직 인터넷에 기대는 것은 `check` 가 경고한다 |
 | 필기가 그 자리에 남는다 | 슬라이드마다 저장되고, 양쪽 화면에 보이고, 새로고침해도 남는다 |
+| 영상은 노트북에서 다룬다 | 발표자 창 미리보기 아래에서 재생·일시정지·위치 이동. 프로젝터가 재생하고 미리보기는 소리 없이 따라간다 |
+| "아까 그 표"를 바로 찾는다 | `G` 로 모든 슬라이드를 펼치고, 낱말을 치면 제목·본문·노트에서 찾는다 |
 | 유인물에 모든 단계가 들어간다 | `Ctrl/⌘+P` 로 각 슬라이드의 최종 모습을 한 쪽씩 인쇄 |
 | 원본은 안전하다 | `inject`, `build` 는 옆에 새 파일을 만든다 |
 
@@ -118,6 +120,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 | ".hdek 으로 묶어 줘" | 영상이 큰 덱용 ZIP 패키지. 플레이어로 연다 |
 | "PDF랑 PPTX 백업 만들어 줘" | PPTX·PDF만 받는 학회용. 슬라이드별 최종 화면, 노트는 PPTX 노트로 |
 | "발표 전에 덱 점검해 줘" | 외부 CDN, 웹폰트, 없는 파일, 노트 없는 슬라이드 |
+| "이 폴더 DeckWright 덱들 최신으로 바꿔 줘" | 예전에 만든 발표 파일에 최신 런타임을 넣는다(`update`) |
 | "폰트도 파일 안에 넣어 줘" | 웹폰트를 내려받아 넣는다(`--fetch-fonts`). 덱에 쓰인 글자에 필요한 조각만 |
 
 ## 발표할 때
@@ -129,6 +132,10 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 | 발표자 창 | `S` |
 | 프로젝터 전체화면 | `F` (클리커의 `F5`) |
 | 검은 / 흰 화면 | `B` / `W` |
+| 모든 슬라이드를 작은 화면으로 보기, 제목·본문·노트 검색 | `G`, 낱말 입력, `Enter` |
+| 돋보기: 클릭 2배, 영역 드래그, 휠 | `Z`, 오른쪽 클릭은 축소, `Esc` 로 끝 |
+| 슬라이드의 영상 재생 / 일시정지 | `K`, 또는 발표자 창 미리보기 아래의 조작 막대 |
+| 다시 연 뒤 멈춘 곳에서 이어서 | `R` |
 | 펜, 형광펜, 레이저, 지우개 | `D` `H` `L` `E`, 펜 태블릿은 바로 필기, `C` 지우기 |
 | PDF 인쇄 | `Ctrl/⌘+P` |
 | 전체 단축키 | `?` |
@@ -140,6 +147,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 | 명령 | 하는 일 |
 |---|---|
 | `deckwright inject <파일.html>` | 원본 옆에 런타임을 넣은 사본. 그림·영상은 원래 폴더에서 읽는다 |
+| `deckwright update [폴더] [--dry-run]` | DeckWright를 업데이트한 뒤, 폴더 안의 `_DeckWright.html`·`_single.html` 에 최신 런타임을 넣는다 |
 | `deckwright build <입력> [-o talk.html]` | 런타임과 모든 자원을 넣은 단독 HTML (기본: 입력 옆에 `<이름>_single.html`) |
 | `deckwright pack <입력> [-o talk.hdek]` | 영상이 크거나 파일이 많을 때 쓰는 `.hdek` 패키지(ZIP) |
 | `deckwright unpack <talk.hdek> -o 폴더` | 패키지 풀기 |
@@ -183,7 +191,6 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 - 슬라이드를 프로젝터로 저절로 보내는 기능(`S`, `F`)은 Chrome·Edge의 Window Management API를 쓰며 처음에 권한을 한 번 묻는다. Firefox·Safari에는 이 기능이 없어 슬라이드 창을 끌어다 놓고 `F` 를 누른다.
 - 발표자 창 미리보기는 덱을 두 번 더 띄운다. 아주 무거운 덱이면 *미리보기* 버튼으로 실시간 미리보기를 끈다.
-- 영상 재생 위치는 프로젝터와 미리보기 사이에 맞추지 않는다(미리보기 영상은 음소거).
 - 덱이 자체 `setTimeout` 으로 돌리는 애니메이션은 뒤로 갈 때 바로 끝낼 수 없다. 규약의 `setStep` 훅을 쓰면 된다.
 - 플레이어는 덱의 스크립트를 자기 페이지에서 실행한다. HTML 파일을 직접 여는 것과 같으니, 믿을 수 있는 사람이 만든 덱만 연다.
 
@@ -191,7 +198,7 @@ npx skills add grotyx/deckwright -g     # 모든 프로젝트에
 
 [사용 설명서](docs/manual.ko.md) &middot; [규약 (hdek/1)](SPEC.ko.md) &middot; [스킬 지시문](skills/deckwright/SKILL.md) &middot; [변경 내역](CHANGELOG.ko.md)
 
-개발: `npm run build` 로 플레이어·데모·스킬 zip을 다시 만들고, `npm test` 로 Chromium·명령줄 검사 100개를 돌린다. 코드 리뷰에서 찾은 결함마다 회귀 테스트가 들어 있다(Python용 Playwright, `pdfplumber`, `python-pptx` 필요).
+개발: `npm run build` 로 플레이어·데모·스킬 zip을 다시 만들고, `npm test` 로 Chromium·명령줄 검사 121개를 돌린다. 코드 리뷰에서 찾은 결함마다 회귀 테스트가 들어 있다(Python용 Playwright, `pdfplumber`, `python-pptx` 필요).
 
 ## 저자
 

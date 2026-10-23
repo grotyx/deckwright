@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.3.3-111111?style=flat-square" alt="Version 0.3.3">
+  <img src="https://img.shields.io/badge/version-0.3.4-111111?style=flat-square" alt="Version 0.3.4">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -63,7 +63,7 @@ Double-click the new file and press `S`. In Chrome or Edge with the projector se
 ## How it works
 
 ```text
- talk.html  +  runtime (inline, ~85 KB, no network)
+ talk.html  +  runtime (inline, ~130 KB, no network)
       │
       ├─▶ audience window       slides only, on the projector
       └─▶ presenter window      current · next · notes · timer · pen, on your laptop
@@ -82,6 +82,8 @@ Double-click the new file and press `S`. In Chrome or Edge with the projector se
 | The clicker works | Arrow keys, PageUp/PageDown, F5, the blank-screen key, mouse wheel and click |
 | Nothing breaks without Wi-Fi | `build` inlines every asset; `--fetch-fonts` downloads web fonts (Google Fonts) into the file; `check` warns about anything still online |
 | Ink stays where you put it | Saved per slide, shown on both screens, kept through a reload |
+| Video is run from the laptop | Play, pause and seek under the presenter's preview; the projector plays, the preview follows silently |
+| "That table" is found in a second | `G` shows every slide; typing searches titles, slide text and notes |
 | The handout has every step | `Ctrl/⌘+P` prints the final state of each slide, one per page |
 | Your original is safe | `inject` and `build` write a new file next to it |
 
@@ -119,6 +121,7 @@ npx skills add grotyx/deckwright -g     # every project
 | "package it as .hdek" | A ZIP package for decks with large videos, opened with the player |
 | "export a PDF and PPTX backup" | For conferences that only take PPTX or PDF: each slide's final look, notes in the PPTX notes |
 | "check my deck before the talk" | External CDNs, web fonts, missing files, slides without notes |
+| "update my DeckWright decks in this folder" | Older presentation files get the current runtime (`update`) |
 | "put the fonts inside the file" | Web fonts are downloaded and embedded (`--fetch-fonts`), only the slices for the characters the deck uses |
 
 ## Presenting
@@ -130,6 +133,10 @@ npx skills add grotyx/deckwright -g     # every project
 | Presenter view | `S` |
 | Fullscreen on the projector | `F` (or a clicker's `F5`) |
 | Black / white screen | `B` / `W` |
+| All slides as thumbnails, search titles, text and notes | `G`, type, `Enter` |
+| Magnifier: click 2×, drag an area, wheel | `Z`; right-click zooms out, `Esc` ends |
+| Play / pause the slide's video | `K`, or the controls under the presenter's preview |
+| Continue where you stopped after reopening | `R` |
 | Pen, highlighter, laser, eraser | `D` `H` `L` `E`; a pen tablet writes right away; `C` clears |
 | Print to PDF | `Ctrl/⌘+P` |
 | All shortcuts | `?` |
@@ -141,6 +148,7 @@ The interface follows the browser language (English or Korean).
 | Command | What it does |
 |---|---|
 | `deckwright inject <file.html>` | Adds the runtime to a copy next to the original; images and video still load from the original folder |
+| `deckwright update [folder] [--dry-run]` | After updating DeckWright: puts the current runtime into every `_DeckWright.html` / `_single.html` in the folder |
 | `deckwright build <input> [-o talk.html]` | One self-contained HTML with the runtime and every asset (default `<name>_single.html` next to the input) |
 | `deckwright pack <input> [-o talk.hdek]` | `.hdek` package (ZIP) for large videos or many files |
 | `deckwright unpack <talk.hdek> -o dir` | Extract a package |
@@ -184,7 +192,6 @@ Effects, JS hooks for counters and charts, events, the `.hdek` format and how ot
 
 - Putting the slides on the projector by themselves (`S`, `F`) uses Chrome/Edge's Window Management API, which asks permission once; Firefox and Safari do not have it, so there you drag the slide window over and press `F`.
 - The presenter previews load the deck twice more. On a very heavy deck, turn the live preview off with the *Preview* button.
-- Video position is not synced between the projector and the previews (preview video is muted).
 - An animation the deck runs with its own `setTimeout` cannot be finished instantly when going back; the contract's `setStep` hook can.
 - The player runs a deck's scripts on its own page, the same as opening the HTML file directly. Open decks from people you trust.
 
@@ -192,7 +199,7 @@ Effects, JS hooks for counters and charts, events, the `.hdek` format and how ot
 
 [User guide](docs/manual.md) &middot; [Spec (hdek/1)](SPEC.md) &middot; [Skill instructions](skills/deckwright/SKILL.md) &middot; [Changelog](CHANGELOG.md)
 
-Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 100 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
+Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 121 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
 
 ## Author
 

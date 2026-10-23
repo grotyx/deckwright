@@ -130,9 +130,13 @@ Readers must treat a package as untrusted input: entry names that leave the pack
 | Presenter view | `S` |
 | Fullscreen (on the second screen when there is one) | `F` (a clicker's `F5` does the same) |
 | Black / white screen | `B` `.` / `W` `,` |
+| All slides (thumbnails) and search | `G` (in the presenter view: there; in the audience window: on the projector). Typing searches titles, slide text and notes, or a slide number; `Enter` or a click goes to that slide with every step revealed |
+| Magnifier | `Z`, then click (2× around the point), drag (that area fills the screen) or wheel (at the pointer); right-click zooms out; `Esc`, `Z` or moving on ends it. Works on the audience window and on the presenter's current preview |
+| Play / pause video | `K` (the first `video`/`audio` on the slide) |
+| Continue where you stopped | `R`, offered right after opening when the last saved position is in the middle of the deck |
 | Pen / highlighter / laser / eraser | `D` / `H` / `L` / `E` (a stylus writes without choosing a tool) |
 | Clear ink on slide / everywhere | `C` / `Shift+C` |
-| Tool off | `Esc` |
+| Tool off, then zoom off | `Esc` |
 | Shortcut help | `?` |
 | Print / PDF | `Ctrl/⌘+P` (final look with every step revealed, one page per slide) |
 
@@ -142,12 +146,20 @@ Clicking an element with `cursor: pointer`, a link, button or input, or anything
 
 Pressing `S` in the audience window opens a new window. The current and next previews load the same deck again in preview-only mode (`window.name` starts with `hdek-preview`), so CSS, JS, canvas and video look exactly as they do for the audience. Preview video is muted. For heavy decks, the "Preview" button turns off the live current-slide preview.
 
+When the current slide has `video` or `audio`, the presenter view shows controls for each (up to three): play/pause, ±10 s, position, time, sound. They act on the audience window's elements; the current preview follows muted, and the next preview and thumbnails never play. If the browser refuses to play with sound (autoplay policy), the video plays muted and the presenter view says so.
+
+The overview (`G`) loads thumbnails as further preview frames (`window.name` `hdek-preview-thumb`), only those scrolled into view and three at a time, and removes them when it closes.
+
+The position (`slide`, `step`) is saved in browser storage on every move, in every mode. On opening, the deck starts at slide 1 and offers `R` if the saved position is in the middle of the deck; the offer ends with the first move.
+
 Ink is stored per slide id in normalized coordinates (0–1). Whatever is drawn in either the audience or the presenter window shows in both. It is kept in browser storage, so an accidental reload keeps it.
 
 ### Preview protocol (postMessage)
 
 ```
 parent → preview   { hdek: 1, type: "goto", slide, step, animate }
+parent → preview   { hdek: 1, type: "zoom", r: { x, y, w, h } | null, instant }   // r in slide fractions
+parent → preview   { hdek: 1, type: "media", slide, list: [{ t, p }] }          // time, playing
 preview → parent   { hdek: 1, type: "ready", count }
 preview → parent   { hdek: 1, type: "key", key, shiftKey }
 ```

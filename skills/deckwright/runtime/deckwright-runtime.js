@@ -1,4 +1,4 @@
-/*! DeckWright runtime v0.3.3 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright runtime v0.3.4 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -7,7 +7,7 @@
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
   var PRODUCT = 'DeckWright';
-  var VERSION = '0.3.3';
+  var VERSION = '0.3.4';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 
@@ -86,7 +86,38 @@
     '.hdek-blank{position:fixed;inset:0;z-index:2147483200;display:none}',
     '.hdek-blank.hdek-blank-on{display:block}',
     '.hdek-ui-host{position:fixed;inset:0;z-index:2147483300;pointer-events:none}',
+    '.hdek-ink.hdek-active.hdek-zoomtool{cursor:zoom-in}',
+    'html.hdek-zoomed, html.hdek-zoomed body{overflow:hidden!important}',
     '@media print{.hdek-ui,.hdek-ui-host,.hdek-blank{display:none!important}}'
+  ].join('\n');
+
+  // Slide overview (grid of thumbnails + search), shared by the audience window and the presenter view
+  var GRID_CSS = [
+    '.hdg{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;background:#0c0c0f;color:#ececf0;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;pointer-events:auto;cursor:default}',
+    '.hdg *{box-sizing:border-box}',
+    '.hdg-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid #24242b}',
+    '.hdg-q{flex:1;max-width:560px;height:38px;padding:0 14px;border-radius:9px;border:1px solid #3a3a44;background:#1b1b21;color:#fff;font:inherit;font-size:16px;outline:none}',
+    '.hdg-q:focus{border-color:#0a84ff}',
+    '.hdg-n{color:#9a9aa5;font-variant-numeric:tabular-nums}',
+    '.hdg-sp{flex:1}',
+    '.hdg-x{all:unset;cursor:pointer;padding:8px 12px;border-radius:8px;background:#24242c;color:#ddd}',
+    '.hdg-x:hover{background:#2e2e37}',
+    '.hdg-cards{flex:1;overflow:auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;align-content:start}',
+    '.hdg-card{cursor:pointer;border-radius:10px;padding:8px;background:#16161b;border:2px solid transparent}',
+    '.hdg-card:hover{background:#1e1e25}',
+    '.hdg-card.sel{border-color:#0a84ff}',
+    '.hdg-card.now .hdg-cap b{background:#30d158;color:#000}',
+    '.hdg-th{position:relative;overflow:hidden;border-radius:6px;background:#000}',
+    '.hdg-th iframe{position:absolute;left:0;top:0;border:0;transform-origin:0 0;pointer-events:none;background:#000;visibility:hidden}',
+    '.hdg-th iframe.on{visibility:visible}',
+    '.hdg-ph{position:absolute;inset:0;display:grid;place-items:center;padding:10px;color:#6c6c76;font-size:13px;text-align:center;overflow:hidden}',
+    '.hdg-cap{display:flex;gap:8px;align-items:baseline;margin-top:7px;white-space:nowrap;overflow:hidden}',
+    '.hdg-cap b{flex:none;min-width:24px;padding:0 6px;border-radius:5px;background:#2a2a33;text-align:center;font-variant-numeric:tabular-nums;font-size:12px}',
+    '.hdg-cap span{overflow:hidden;text-overflow:ellipsis}',
+    '.hdg-snip{margin-top:4px;color:#a0a0aa;font-size:12px;line-height:1.35;max-height:2.7em;overflow:hidden}',
+    '.hdg-snip:empty{display:none}',
+    '.hdg-snip mark{background:#ffd60a;color:#000;border-radius:2px;padding:0 1px}',
+    '.hdg-none{grid-column:1/-1;color:#888;padding:40px;text-align:center}'
   ].join('\n');
 
   // Toolbar, toast, help and go-to box live in a shadow root, so a deck's CSS (td, kbd, .card, .on …) cannot reach them
@@ -114,8 +145,9 @@
     '.hdek-help table{border-collapse:collapse;font-size:14px}',
     '.hdek-help td{padding:4px 18px 4px 0;vertical-align:top}',
     '.hdek-help kbd{display:inline-block;padding:1px 7px;margin:1px 2px;border-radius:5px;background:#2c2c32;border:1px solid #3a3a42;font:12px ui-monospace,Menlo,Consolas,monospace;color:#fff}',
-    '.hdek-help td{color:#fff}'
-  ].join('\n');
+    '.hdek-help td{color:#fff}',
+    '.hdek-zband{position:fixed;display:none;border:2px solid #0a84ff;background:rgba(10,132,255,.14);border-radius:3px;pointer-events:none}'
+  ].join('\n') + '\n' + GRID_CSS;
 
   function injectCSS(doc, css, id) {
     var s = doc.createElement('style');
@@ -138,7 +170,13 @@
     presenter: '<rect x="2" y="4" width="13" height="10" rx="1.5"/><path d="M18 8h4M18 12h4M18 16h4M6 20h5M8.5 14v6"/>',
     full: '<path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>',
     help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.7-2.5 2-2.5 3.5"/><path d="M12 17h.01"/>',
-    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    zoom: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21M10.5 7.5v6M7.5 10.5h6"/>',
+    grid: '<rect x="3" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2"/>',
+    play: '<path d="M7 4.5l12 7.5-12 7.5z" fill="currentColor"/>',
+    pause: '<path d="M7 4.5h3.5v15H7zM13.5 4.5H17v15h-3.5z" fill="currentColor"/>',
+    vol: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/>',
+    mute: '<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5"/>'
   };
   function svg(name) { return '<svg viewBox="0 0 24 24">' + ICON[name] + '</svg>'; }
 
@@ -655,9 +693,11 @@
     if (ROLE === 'audience' && s && s.autoplay && D.state.step < s.max) {
       autoTimer = setTimeout(function () { if (D.state.slide === D.slides.indexOf(s)) next(); }, s.autoplay);
     }
-    if (ROLE === 'audience' && D.mode !== 'driver') {
-      try { history.replaceState(null, '', '#' + (D.state.slide + 1) + (D.state.step ? '.' + D.state.step : '')); } catch (e) { }
-      store('hdek-pos:' + deckKey(), JSON.stringify(D.state));
+    if (ROLE === 'audience') {
+      if (resumeOffer && D.state.slide !== resumeOffer.from) resumeOffer = null; // moving on drops the "continue" offer
+      if (D.mode !== 'driver') { try { history.replaceState(null, '', '#' + (D.state.slide + 1) + (D.state.step ? '.' + D.state.step : '')); } catch (e) { } }
+      if (!resumeOffer && D.ready) store('hdek-pos:' + deckKey(), JSON.stringify({ slide: D.state.slide, step: D.state.step, t: Date.now() }));
+      if (zoomRect) setZoom(null, true);
     }
     fit();
     renderInk();
@@ -706,9 +746,110 @@
   // Lay the ink canvas exactly over the current slide (stage)
   function inkBox() {
     var el = D.staged ? D.root : (D.slides[D.state.slide] && D.slides[D.state.slide].el);
-    var r = el && el !== document.body ? el.getBoundingClientRect() : null;
+    var r = el && el !== document.body ? unzoom(el.getBoundingClientRect()) : null;
     if (!r || r.width < 50 || r.height < 50 || D.mode === 'single') r = { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
     return r;
+  }
+
+  // ------------------------------------------------------------------ zoom (magnifier)
+  // zoomRect is the part of the slide that fills the screen, in slide fractions {x, y, w, h}; null = not zoomed.
+  // The whole page is scaled (so ink and everything on the slide follow); the toolbar is scaled back.
+  var zoomRect = null, uiHost = null, uiRoot = null, zoomBand = null;
+  var FULL = { x: 0, y: 0, w: 1, h: 1 };
+  var ZOOM_EASE = 'transform .28s cubic-bezier(.2,.7,.2,1)';
+  function htmlMatrix() {
+    try {
+      var t = getComputedStyle(document.documentElement).transform;
+      return t && t !== 'none' && window.DOMMatrix ? new DOMMatrix(t) : null;
+    } catch (e) { return null; }
+  }
+  // a rectangle measured on screen, back in the page's own (unzoomed) coordinates
+  function unzoom(r) {
+    var m = htmlMatrix();
+    if (!m || m.isIdentity) return r;
+    var k = m.inverse(), p = k.transformPoint(new DOMPoint(r.left, r.top)), q = k.transformPoint(new DOMPoint(r.right, r.bottom));
+    return { left: p.x, top: p.y, width: q.x - p.x, height: q.y - p.y, right: q.x, bottom: q.y };
+  }
+  function zoomXform(r, b, vw, vh) {
+    var z = Math.min(vw / (r.w * b.width), vh / (r.h * b.height));
+    var cx = b.left + (r.x + r.w / 2) * b.width, cy = b.top + (r.y + r.h / 2) * b.height;
+    return { z: z, tx: vw / 2 - cx * z, ty: vh / 2 - cy * z };
+  }
+  // a point on screen (vw × vh view, slide box b) → slide fractions, taking the current zoom into account
+  function viewToSlide(px, py, vw, vh, b) {
+    if (zoomRect) { var X = zoomXform(zoomRect, b, vw, vh); px = (px - X.tx) / X.z; py = (py - X.ty) / X.z; }
+    return [(px - b.left) / b.width, (py - b.top) / b.height];
+  }
+  function fitRect(r) {
+    var w = clamp(r.w, 0.1, 1), h = clamp(r.h, 0.1, 1);
+    return { x: clamp(r.x, 0, 1 - w), y: clamp(r.y, 0, 1 - h), w: w, h: h };
+  }
+  function applyZoom(instant) {
+    var html = document.documentElement, st = html.style, tr = instant ? 'none' : ZOOM_EASE, hs = uiHost && uiHost.style;
+    if (!zoomRect) {
+      if (!st.transform && !html.classList.contains('hdek-zoomed')) return;
+      st.transition = tr; st.transform = ''; html.classList.remove('hdek-zoomed');
+      if (hs) { hs.transition = tr; hs.transform = ''; }
+      return;
+    }
+    var b = inkBox(), X = zoomXform(zoomRect, b, window.innerWidth, window.innerHeight);
+    html.classList.add('hdek-zoomed');
+    st.transformOrigin = '0 0'; st.transition = tr;
+    st.transform = 'translate(' + X.tx + 'px,' + X.ty + 'px) scale(' + X.z + ')';
+    if (hs) { hs.transformOrigin = '0 0'; hs.transition = tr; hs.transform = 'scale(' + (1 / X.z) + ') translate(' + (-X.tx) + 'px,' + (-X.ty) + 'px)'; }
+  }
+  function setZoom(r, instant) {
+    if (!r && !zoomRect) return;
+    r = r ? fitRect(r) : null;
+    if (r && r.w > 0.999 && r.h > 0.999) r = null;
+    zoomRect = r;
+    applyZoom(instant);
+    Presenter.zoom(instant);
+  }
+  function zoomIn(p) { var c = zoomRect || FULL; setZoom({ x: p[0] - c.w / 4, y: p[1] - c.h / 4, w: c.w / 2, h: c.h / 2 }); }
+  function zoomOut() {
+    var c = zoomRect; if (!c) return;
+    var cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+    setZoom({ x: cx - c.w, y: cy - c.h, w: c.w * 2, h: c.h * 2 });
+  }
+  function zoomBy(p, f) { var c = zoomRect || FULL; setZoom({ x: p[0] - (p[0] - c.x) * f, y: p[1] - (p[1] - c.y) * f, w: c.w * f, h: c.h * f }); }
+  // a click zooms in 2× around the point, a drag zooms to the dragged area
+  function zoomGesture(s0, e, map) {
+    if (Math.abs(e.clientX - s0.x) < 12 && Math.abs(e.clientY - s0.y) < 12) { zoomIn(map(e.clientX, e.clientY)); return; }
+    var a = map(s0.x, s0.y), b = map(e.clientX, e.clientY);
+    setZoom({ x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) });
+  }
+  function showBand(el, x0, y0, x1, y1) {
+    if (!el) return;
+    var s = el.style; s.display = 'block';
+    s.left = Math.min(x0, x1) + 'px'; s.top = Math.min(y0, y1) + 'px'; s.width = Math.abs(x1 - x0) + 'px'; s.height = Math.abs(y1 - y0) + 'px';
+  }
+  var zoomWheelAcc = 0, zoomWheelLock = 0;
+  function zoomWheel(e, p) {
+    e.preventDefault();
+    var now = Date.now();
+    if (now < zoomWheelLock) return;
+    zoomWheelAcc += e.deltaY;
+    if (Math.abs(zoomWheelAcc) < 40) return;
+    zoomBy(p, zoomWheelAcc < 0 ? 0.8 : 1.25);
+    zoomWheelAcc = 0; zoomWheelLock = now + 90;
+  }
+  function onUI(t) { return !!(t && t.closest && t.closest('.hdek-ui-host')); }
+  function bindZoom() {
+    var start = null, map = function (x, y) { return viewToSlide(x, y, window.innerWidth, window.innerHeight, inkBox()); };
+    window.addEventListener('pointerdown', function (e) {
+      if (D.tool !== 'zoom' || e.button !== 0 || onUI(e.target)) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      start = { x: e.clientX, y: e.clientY };
+    }, true);
+    window.addEventListener('pointermove', function (e) { if (start) showBand(zoomBand, start.x, start.y, e.clientX, e.clientY); }, true);
+    window.addEventListener('pointerup', function (e) {
+      if (!start) return;
+      var s0 = start; start = null;
+      if (zoomBand) zoomBand.style.display = 'none';
+      inkClickBlock = Date.now() + 400;
+      zoomGesture(s0, e, map);
+    }, true);
   }
   function positionInk() {
     if (!inkCanvas) return;
@@ -725,6 +866,7 @@
   function Ink(canvas, boxFn) { this.c = canvas; this.box = boxFn; }
   Ink.prototype.size = function () {
     var b = this.box(), dpr = Math.min(2, (window.devicePixelRatio || 1) * (b.scale || 1));
+    dpr *= Math.min(1, 4096 / Math.max(1, b.w * dpr, b.h * dpr)); // a zoomed presenter canvas can get very large
     var w = Math.max(1, Math.round(b.w * dpr)), h = Math.max(1, Math.round(b.h * dpr));
     if (this.c.width !== w || this.c.height !== h) { this.c.width = w; this.c.height = h; }
     return { w: w, h: h };
@@ -831,7 +973,7 @@
       drawing = { t: D.tool, c: D.tool === 'hl' ? (D.color === '#111111' ? '#ffd60a' : D.color) : D.color, w: D.tool === 'hl' ? 0.026 : 0.0042, p: [pt(e)] };
       renderInk();
     }
-    canvas.addEventListener('pointerdown', function (e) { if (D.tool && !down) begin(e); });
+    canvas.addEventListener('pointerdown', function (e) { if (D.tool && D.tool !== 'zoom' && !down) begin(e); });
     canvas.addEventListener('pointermove', function (e) {
       if (D.tool === 'laser') { moveLaser(pt(e)); return; }
       if (!down) return;
@@ -897,10 +1039,12 @@
   }
 
   function setTool(t) {
+    var was = D.tool;
     D.tool = (D.tool === t) ? null : t;
     if (t === null) D.tool = null;
     if (D.tool !== 'laser') { laser = null; laserTrail = []; }
-    if (inkCanvas) { inkCanvas.classList.toggle('hdek-active', !!D.tool); if (D.tool) positionInk(); }
+    if (was === 'zoom' && !D.tool) setZoom(null); // turning the magnifier off zooms back out; other tools keep the zoom
+    if (inkCanvas) { inkCanvas.classList.toggle('hdek-active', !!D.tool); inkCanvas.classList.toggle('hdek-zoomtool', D.tool === 'zoom'); if (D.tool) positionInk(); }
     Presenter.toolChanged();
     updateBar();
     renderInk();
@@ -910,6 +1054,7 @@
   var blankEl = null;
   function setBlank(kind) {
     D.blank = (D.blank === kind) ? null : kind;
+    if (D.blank) setZoom(null, true);
     if (!blankEl) return;
     blankEl.className = 'hdek-blank' + (D.blank ? ' hdek-blank-on' : '');
     blankEl.style.background = D.blank === 'white' ? '#fff' : '#000';
@@ -920,20 +1065,20 @@
   var bar = null, toastEl = null, gotoEl = null, helpEl = null, idleTimer = null;
   function setupUI() {
     blankEl = document.createElement('div'); blankEl.className = 'hdek-blank'; document.body.appendChild(blankEl);
-    var host = document.createElement('div'); host.className = 'hdek-ui hdek-ui-host';
+    var host = uiHost = document.createElement('div'); host.className = 'hdek-ui hdek-ui-host';
     document.body.appendChild(host);
-    var uiRoot = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
+    uiRoot = host.attachShadow ? host.attachShadow({ mode: 'open' }) : host;
     var st = document.createElement('style'); st.textContent = UI_CSS; uiRoot.appendChild(st);
     if (uiRoot === host) injectCSS(document, UI_CSS.replace(':host{all:initial}', ''), 'hdek-ui-css');
     bar = document.createElement('div'); bar.className = 'hdek-ui hdek-bar';
     var html = '' +
       btn('prev', T('이전 (←)', 'Previous (←)')) + '<span class="hdek-num"></span>' + btn('next', T('다음 (→)', 'Next (→)')) +
       '<span class="sep"></span>' +
-      btn('pen', T('펜 (D)', 'Pen (D)'), 'pen') + btn('hl', T('형광펜 (H)', 'Highlighter (H)'), 'hl') + btn('laser', T('레이저 (L)', 'Laser (L)'), 'laser') + btn('eraser', T('지우개 (E)', 'Eraser (E)'), 'eraser') +
+      btn('pen', T('펜 (D)', 'Pen (D)'), 'pen') + btn('hl', T('형광펜 (H)', 'Highlighter (H)'), 'hl') + btn('laser', T('레이저 (L)', 'Laser (L)'), 'laser') + btn('eraser', T('지우개 (E)', 'Eraser (E)'), 'eraser') + btn('zoom', T('돋보기 (Z)', 'Magnifier (Z)'), 'zoom') +
       COLORS.slice(0, 4).map(function (c) { return '<button class="hdek-swb" data-color="' + c + T('" title="색"><span class="hdek-sw" style="background:', '" title="Color"><span class="hdek-sw" style="background:') + c + '"></span></button>'; }).join('') +
       btn('clear', T('이 슬라이드 필기 지우기 (C)', 'Clear ink on this slide (C)')) +
       '<span class="sep"></span>' +
-      btn('blank', T('검은 화면 (B)', 'Black screen (B)')) + btn('presenter', T('발표자 창 (S)', 'Presenter view (S)')) + btn('full', T('전체화면 / 프로젝터 (F)', 'Fullscreen / projector (F)')) + btn('help', T('단축키 (?)', 'Shortcuts (?)'));
+      btn('blank', T('검은 화면 (B)', 'Black screen (B)')) + btn('grid', T('슬라이드 한눈에 보기 · 검색 (G)', 'All slides · search (G)')) + btn('presenter', T('발표자 창 (S)', 'Presenter view (S)')) + btn('full', T('전체화면 / 프로젝터 (F)', 'Fullscreen / projector (F)')) + btn('help', T('단축키 (?)', 'Shortcuts (?)'));
     bar.innerHTML = html;
     function btn(name, title, tool) { return '<button data-act="' + name + '"' + (tool ? ' data-tool="' + tool + '"' : '') + ' title="' + title + '">' + svg(name) + '</button>'; }
     bar.addEventListener('click', function (e) {
@@ -947,10 +1092,12 @@
     gotoEl = document.createElement('div'); gotoEl.className = 'hdek-ui hdek-goto'; uiRoot.appendChild(gotoEl);
     helpEl = document.createElement('div'); helpEl.className = 'hdek-ui hdek-help'; helpEl.innerHTML = helpHTML(); uiRoot.appendChild(helpEl);
     helpEl.addEventListener('click', function () { helpEl.classList.remove('on'); });
+    zoomBand = document.createElement('div'); zoomBand.className = 'hdek-ui hdek-zband'; uiRoot.appendChild(zoomBand);
+    audGrid = SlideGrid(document, uiRoot, window);
     document.addEventListener('mousemove', function (e) {
       document.documentElement.classList.remove('hdek-idle');
       clearTimeout(idleTimer);
-      var nearBottom = e.clientY > window.innerHeight - 140 && e.clientX < 760;
+      var nearBottom = e.clientY > window.innerHeight - 140 && e.clientX < 880;
       bar.classList.toggle('show', nearBottom || bar.matches(':hover'));
       idleTimer = setTimeout(function () { if (!D.tool && !bar.matches(':hover')) { document.documentElement.classList.add('hdek-idle'); bar.classList.remove('show'); } }, 2200);
     });
@@ -970,6 +1117,10 @@
     var rows = [
       [T('다음 / 이전', 'Next / previous'), T('<kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd> 클릭·휠↓ / <kbd>←</kbd><kbd>PgUp</kbd> 오른쪽 클릭·휠↑', '<kbd>→</kbd><kbd>Space</kbd><kbd>PgDn</kbd> click · wheel ↓ / <kbd>←</kbd><kbd>PgUp</kbd> right-click · wheel ↑')],
       [T('처음 / 끝 · 이동', 'First / last · go to'), T('<kbd>Home</kbd> <kbd>End</kbd> · 숫자 + <kbd>Enter</kbd>', '<kbd>Home</kbd> <kbd>End</kbd> · number + <kbd>Enter</kbd>')],
+      [T('슬라이드 한눈에 보기 · 검색', 'All slides · search'), '<kbd>G</kbd>'],
+      [T('지난번 멈춘 곳에서 이어서', 'Continue where you stopped'), T('<kbd>R</kbd> (덱을 연 직후)', '<kbd>R</kbd> (right after opening)')],
+      [T('돋보기', 'Magnifier'), T('<kbd>Z</kbd> 후 클릭(2배) · 드래그(그 영역) · 휠, 오른쪽 클릭 축소', '<kbd>Z</kbd>, then click (2×) · drag (that area) · wheel; right-click zooms out')],
+      [T('영상 재생 / 일시정지', 'Play / pause video'), '<kbd>K</kbd>'],
       [T('발표자 창', 'Presenter view'), '<kbd>S</kbd>'],
       [T('전체화면 · 프로젝터로', 'Fullscreen · to projector'), '<kbd>F</kbd>'],
       [T('검은 / 흰 화면', 'Black / white screen'), '<kbd>B</kbd> <kbd>.</kbd> / <kbd>W</kbd>'],
@@ -1074,6 +1225,19 @@
       case 'blank': setBlank('black'); break;
       case 'white': setBlank('white'); break;
       case 'presenter': startPresenting(); break;
+      case 'zoom': setTool('zoom'); break;
+      case 'grid':
+        // G in the presenter view opens the overview there; in the audience window it opens on the slides
+        if (Presenter.isOpen() && !(ev && ev.view === window)) Presenter.grid().open();
+        else if (audGrid) { setZoom(null, true); audGrid.open(); }
+        break;
+      case 'media': {
+        var ms = currentMedia();
+        if (!ms.length) toast(T('이 슬라이드에는 영상이 없습니다', 'No video on this slide'));
+        else togglePlay(ms[0]);
+        break;
+      }
+      case 'resume': if (resumeOffer) { var ro = resumeOffer; resumeOffer = null; go(ro.slide, ro.step, false); Presenter.update(); } break;
       case 'full': toggleFullscreen(); break;
       case 'help': if (helpEl) helpEl.classList.toggle('on'); break;
       case 'print': window.print(); break;
@@ -1099,6 +1263,10 @@
       case 'l': case 'L': return 'laser';
       case 'e': case 'E': return 'eraser';
       case 'c': case 'C': return 'clear';
+      case 'z': case 'Z': return 'zoom';
+      case 'g': case 'G': return 'grid';
+      case 'k': case 'K': return 'media';
+      case 'r': case 'R': return resumeOffer ? 'resume' : null; // otherwise the key stays the deck's
       case '?': return 'help';
     }
     return null;
@@ -1121,8 +1289,17 @@
       setTimeout(poll, 30);
     })();
   }
+  function gridFor(e) {
+    var v = e && e.view;
+    if (audGrid && audGrid.isOpen() && v === window) return audGrid;
+    var pg = Presenter.grid();
+    if (pg && pg.isOpen() && v && v !== window) return pg;
+    return null;
+  }
   function handleKey(e) {
     if (e.__hdek) return;
+    var g = gridFor(e);
+    if (g) { g.key(e); return; } // the overview has the keyboard (search box, arrows, Enter, Esc)
     // clickers send PageUp/PageDown: they must work even while a text field has focus
     if (isTyping(e.target) && e.key !== 'PageDown' && e.key !== 'PageUp') return;
     var k = e.key;
@@ -1139,6 +1316,7 @@
       if (gotoBuf) { gotoBuf = ''; showGoto(); return; }
       if (helpEl && helpEl.classList.contains('on')) { helpEl.classList.remove('on'); return; }
       if (D.tool) { setTool(null); return; }
+      if (zoomRect) { setZoom(null); return; }
       if (D.blank) { setBlank(D.blank); return; }
       return;
     }
@@ -1193,6 +1371,7 @@
     }, true);
     // Right-click goes back (the browser menu is not shown on the slides)
     window.addEventListener('contextmenu', function (e) {
+      if (D.tool === 'zoom' && !onUI(e.target)) { e.preventDefault(); e.stopImmediatePropagation(); zoomOut(); return; }
       if (!D.clickAdvance || D.tool || D.mode === 'single') return;
       if (isTyping(e.target) || (e.target && e.target.closest && e.target.closest('.hdek-ui, a, input, textarea, select, [contenteditable]'))) return;
       e.preventDefault();
@@ -1200,6 +1379,8 @@
       prev();
     }, true);
     window.addEventListener('wheel', function (e) {
+      if (audGrid && audGrid.isOpen()) return; // the overview scrolls
+      if (D.tool === 'zoom' && !onUI(e.target)) { e.stopImmediatePropagation(); zoomWheel(e, viewToSlide(e.clientX, e.clientY, window.innerWidth, window.innerHeight, inkBox())); return; }
       if (!D.wheelAdvance || e.ctrlKey || D.mode === 'single') return;
       var el = e.target;
       while (el && el !== document.body && el.nodeType === 1) {
@@ -1228,7 +1409,8 @@
         if (D.mode === 'driver') afterDeck(f); else f();
       }
     }, { passive: true });
-    window.addEventListener('resize', function () { fit(); Presenter.layout(); });
+    bindZoom();
+    window.addEventListener('resize', function () { fit(); if (zoomRect) applyZoom(true); Presenter.layout(); });
     // the slide may still be animating into place when it becomes current: re-fit the ink canvas when it settles
     ['transitionend', 'animationend'].forEach(function (t) {
       document.addEventListener(t, function (e) { var s = D.slides[D.state.slide]; if (s && e.target === s.el) positionInk(); }, true);
@@ -1242,6 +1424,7 @@
   // ------------------------------------------------------------------ print
   var printStyle = null, printAdded = [], printSaved = null;
   function printPrepare() {
+    setZoom(null, true);
     var html = document.documentElement;
     html.classList.add('hdek-printing', 'hdek-snap');
     var fixed = D.staged || D.autostage || D.mode === 'driver';
@@ -1316,15 +1499,8 @@
     var timer = { start: 0, acc: 0, running: false }, tick = null;
     var notesSize = parseInt(store('hdek-notes-size') || '22', 10);
     var showCurLive = store('hdek-cur-live') !== 'off';
-
-    function deckURL() {
-      if (window.__HDEK_SRC__) return window.__HDEK_SRC__;
-      return location.href.replace(/#.*$/, '');
-    }
-    function aspect() {
-      if (D.staged || D.mode === 'reveal') return { w: D.mode === 'reveal' ? (window.Reveal.getConfig().width || 960) : D.width, h: D.mode === 'reveal' ? (window.Reveal.getConfig().height || 700) : D.height };
-      return { w: window.innerWidth || 1280, h: window.innerHeight || 720 };
-    }
+    var pgrid = null, media = [], mediaSlide = -1, mediaSeek = -1, mtick = null, noteTimer = null;
+    var aspect = slideAspect;
 
     function open(onScreen, withShow) {
       if (ROLE !== 'audience') return;
@@ -1343,14 +1519,18 @@
     function close() { try { if (w && !w.closed) w.close(); } catch (e) { } w = null; }
 
     function build() {
+      try { if (tick) w.clearInterval(tick); if (mtick) w.clearInterval(mtick); } catch (e) { }
       var doc = w.document;
       doc.open();
       doc.write(T('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>발표자 화면 — ', '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Presenter view — ') + escapeHTML(D.title) + '</title></head><body></body></html>');
       doc.close();
-      injectCSS(doc, PRESENTER_CSS);
+      injectCSS(doc, PRESENTER_CSS + '\n' + GRID_CSS);
       doc.body.innerHTML = PRESENTER_HTML;
       els = {};
-      ['cur', 'curbox', 'nxt', 'nxtbox', 'notes', 'num', 'stepn', 'elapsed', 'remain', 'clock', 'prog', 'dur', 'title', 'list', 'goto', 'hint', 'blankst', 'tools', 'endcard', 'curoff'].forEach(function (id) { els[id] = doc.getElementById(id); });
+      ['cur', 'curbox', 'nxt', 'nxtbox', 'notes', 'num', 'stepn', 'elapsed', 'remain', 'clock', 'prog', 'dur', 'title', 'goto', 'hint', 'blankst', 'tools', 'endcard', 'curoff', 'media', 'resume', 'note', 'zband'].forEach(function (id) { els[id] = doc.getElementById(id); });
+      if (pgrid) pgrid.close();
+      pgrid = SlideGrid(doc, doc.body, w);
+      media = []; mediaSlide = -1; mediaSeek = -1;
       els.title.textContent = D.title;
       els.notes.style.fontSize = notesSize + 'px';
       if (D.duration) els.dur.value = D.duration;
@@ -1374,21 +1554,130 @@
       doc.addEventListener('wheel', onWheel, { passive: false });
       doc.addEventListener('contextmenu', function (e) {
         var t = e.target;
-        if (D.tool || !t.closest || !t.closest('#cur, #nxt')) return;
+        if (!t.closest || t.closest('#media')) return;
+        if (D.tool === 'zoom' && t.closest('#curbox')) { e.preventDefault(); zoomOut(); return; }
+        if (D.tool || !t.closest('#cur, #nxt')) return;
         e.preventDefault();
         prev();
       });
+      // magnifier on the current-slide preview: click = 2×, drag = that area
+      var zs = null;
+      els.curbox.addEventListener('pointerdown', function (e) {
+        if (D.tool !== 'zoom' || e.button !== 0) return;
+        e.preventDefault();
+        zs = { x: e.clientX, y: e.clientY };
+      });
+      doc.addEventListener('pointermove', function (e) {
+        if (!zs) return;
+        var r = els.curbox.getBoundingClientRect();
+        showBand(els.zband, zs.x - r.left, zs.y - r.top, e.clientX - r.left, e.clientY - r.top);
+      });
+      doc.addEventListener('pointerup', function (e) {
+        if (!zs) return;
+        var s0 = zs; zs = null;
+        els.zband.style.display = 'none';
+        inkClickBlock = Date.now() + 400;
+        zoomGesture(s0, e, previewPoint);
+      });
+      // video controls under the current slide
+      els.media.addEventListener('pointerdown', function (e) { var r = e.target.closest && e.target.closest('input[data-m]'); if (r) mediaSeek = +r.closest('.mrow').dataset.i; });
+      els.media.addEventListener('input', function (e) {
+        var r = e.target; if (!r.matches || !r.matches('input[data-m]')) return;
+        var i = +r.closest('.mrow').dataset.i, m = media[i]; mediaSeek = i;
+        if (m && isFinite(m.duration) && m.duration > 0) { try { m.currentTime = (+r.value / 1000) * m.duration; } catch (x) { } }
+      });
+      els.media.addEventListener('change', function (e) { mediaSeek = -1; if (e.target.blur) e.target.blur(); tickMedia(); });
+      w.addEventListener('pointerup', function () { if (mediaSeek >= 0) setTimeout(function () { mediaSeek = -1; }, 50); });
       doc.getElementById('notesminus').addEventListener('click', function () { setNotes(-2); });
       doc.getElementById('notesplus').addEventListener('click', function () { setNotes(2); });
       els.dur.addEventListener('change', function () { D.duration = parseFloat(els.dur.value) || 0; tickTimer(); els.dur.blur(); });
       els.dur.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === 'Escape') els.dur.blur(); });
       els.elapsed.addEventListener('click', toggleTimer);
-      buildList();
       layout();
       setTimeout(layout, 60);
       tick = w.setInterval(tickTimer, 500);
+      mtick = w.setInterval(tickMedia, 250);
       toolChanged();
       update();
+      pinkZoom(true);
+      if (zoomRect) post('cur', { hdek: 1, type: 'zoom', r: zoomRect, instant: true });
+    }
+
+    // a point in the presenter window → slide fractions of the audience view
+    function previewBox(a) { return (D.staged || D.mode === 'reveal') ? { left: 0, top: 0, width: a.w, height: a.h } : inkBox(); }
+    function previewPoint(cx, cy) {
+      var a = aspect(), r = els.curbox.getBoundingClientRect(), s = r.width / a.w || 1;
+      return viewToSlide((cx - r.left) / s, (cy - r.top) / s, a.w, a.h, previewBox(a));
+    }
+    // follow the audience zoom: the preview zooms itself, the ink canvas over it gets the same transform
+    function zoomP(instant) {
+      if (!w || w.closed) return;
+      post('cur', { hdek: 1, type: 'zoom', r: zoomRect, instant: !!instant });
+      pinkZoom(instant);
+    }
+    function pinkZoom(instant) {
+      if (!els.pink) return;
+      var st = els.pink.style;
+      st.transition = instant ? 'none' : ZOOM_EASE;
+      if (!zoomRect) { st.transform = ''; return; }
+      var a = aspect(), r = els.curbox.getBoundingClientRect(), s = r.width / a.w || 1, b = previewBox(a), X = zoomXform(zoomRect, b, a.w, a.h);
+      st.transformOrigin = (-b.left * s) + 'px ' + (-b.top * s) + 'px';
+      st.transform = 'translate(' + (X.tx * s) + 'px,' + (X.ty * s) + 'px) scale(' + X.z + ')';
+    }
+
+    // ---- video and audio on the current slide: controlled here, played on the projector
+    function renderMedia() {
+      if (!els.media) return;
+      media = currentMedia().slice(0, 3);
+      mediaSlide = D.state.slide;
+      els.media.innerHTML = media.map(function (m, i) {
+        return '<div class="mrow" data-i="' + i + '">' +
+          (media.length > 1 ? '<span class="mi">' + (m.tagName === 'AUDIO' ? '♪' : '▶') + (i + 1) + '</span>' : '') +
+          '<button data-m="play" title="' + T('재생 / 일시정지 (K)', 'Play / pause (K)') + '">' + svg('play') + '</button>' +
+          '<button data-m="back" title="' + T('10초 뒤로', 'Back 10 s') + '">−10</button>' +
+          '<input type="range" min="0" max="1000" value="0" step="1" data-m="seek" title="' + T('재생 위치', 'Position') + '">' +
+          '<button data-m="fwd" title="' + T('10초 앞으로', 'Forward 10 s') + '">+10</button>' +
+          '<span class="mt">0:00</span>' +
+          '<button data-m="mute" title="' + T('소리 켜기 / 끄기', 'Sound on / off') + '">' + svg('vol') + '</button></div>';
+      }).join('');
+      els.cur.classList.toggle('hasmedia', media.length > 0);
+      els.cur.style.setProperty('--mrows', String(media.length));
+      layout();
+      pinkZoom(true);
+      tickMedia();
+    }
+    function tickMedia() {
+      if (!w || w.closed || !els.media) return;
+      var now = currentMedia().slice(0, 3);
+      if (D.state.slide !== mediaSlide || now.length !== media.length || now.some(function (m, i) { return m !== media[i]; })) { renderMedia(); return; }
+      if (!media.length) return;
+      var list = media.map(function (m, i) {
+        var row = els.media.children[i]; if (!row) return null;
+        var d = m.duration, t = m.currentTime || 0, playing = !m.paused && !m.ended;
+        var pb = row.querySelector('[data-m="play"]'), mb = row.querySelector('[data-m="mute"]'), rg = row.querySelector('input');
+        if (pb.__p !== playing) { pb.innerHTML = svg(playing ? 'pause' : 'play'); pb.__p = playing; pb.classList.toggle('on', playing); }
+        if (mb.__m !== m.muted) { mb.innerHTML = svg(m.muted ? 'mute' : 'vol'); mb.__m = m.muted; }
+        if (mediaSeek !== i && isFinite(d) && d > 0) rg.value = String(Math.round(t / d * 1000));
+        row.querySelector('.mt').textContent = fmtTime(t) + ' / ' + (isFinite(d) && d > 0 ? fmtTime(d) : '–:––');
+        return { t: t, p: playing };
+      });
+      post('cur', { hdek: 1, type: 'media', slide: D.state.slide, list: list });
+    }
+    function mediaCmd(i, c) {
+      var m = media[i]; if (!m) return;
+      try {
+        if (c === 'play') togglePlay(m);
+        else if (c === 'back') m.currentTime = Math.max(0, (m.currentTime || 0) - 10);
+        else if (c === 'fwd') m.currentTime = Math.min(isFinite(m.duration) ? m.duration : 1e9, (m.currentTime || 0) + 10);
+        else if (c === 'mute') m.muted = !m.muted;
+      } catch (e) { }
+      tickMedia();
+    }
+    function note(msg) {
+      if (!w || w.closed || !els.note) return;
+      els.note.textContent = msg;
+      clearTimeout(noteTimer);
+      noteTimer = setTimeout(function () { if (els.note) els.note.textContent = ''; }, 9000);
     }
 
     function mkFrame(doc, name, url, a, key) {
@@ -1411,7 +1700,8 @@
         var key = (e.source === (els.curframe && els.curframe.contentWindow)) ? 'cur' : (e.source === (els.nxtframe && els.nxtframe.contentWindow)) ? 'nxt' : null;
         if (!key) return;
         ready[key] = true;
-        if (queued[key]) { post(key, queued[key]); }
+        var q = queued[key] || {};
+        ['zoom', 'goto', 'media'].forEach(function (ty) { if (q[ty]) post(key, q[ty]); });
       }
       if (d.type === 'key') {
         var fromPreview = e.source && ((els.curframe && e.source === els.curframe.contentWindow) || (els.nxtframe && e.source === els.nxtframe.contentWindow));
@@ -1422,7 +1712,7 @@
 
     function post(key, msg) {
       var f = key === 'cur' ? els.curframe : els.nxtframe;
-      queued[key] = msg;
+      (queued[key] = queued[key] || {})[msg.type] = msg; // the latest message of each kind, replayed when the frame is ready
       if (!f || !ready[key]) return;
       try { f.contentWindow.postMessage(msg, '*'); } catch (e) { }
     }
@@ -1433,13 +1723,15 @@
       [['cur', els.cur, els.curbox, els.curframe], ['nxt', els.nxt, els.nxtbox, els.nxtframe]].forEach(function (t) {
         var host = t[1], box = t[2], fr = t[3];
         if (!host || !box) return;
-        var r = host.getBoundingClientRect();
-        var s = Math.min(r.width / a.w, r.height / a.h);
+        var r = host.getBoundingClientRect(), cs = w.getComputedStyle(host);
+        var aw = r.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), ah = r.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+        var s = Math.min(aw / a.w, ah / a.h);
         if (!(s > 0)) return;
         box.style.width = (a.w * s) + 'px'; box.style.height = (a.h * s) + 'px';
         if (fr) { fr.style.width = a.w + 'px'; fr.style.height = a.h + 'px'; fr.style.transform = 'scale(' + s + ')'; }
         if (t[0] === 'cur') placeInk(s);
       });
+      pinkZoom(true);
       renderInk();
     }
     // The audience stores ink relative to the slide rectangle; in an unstaged deck that rectangle is only part of
@@ -1481,26 +1773,23 @@
         w.document.getElementById('nxtlabel').textContent = T('마지막입니다', 'End of deck');
       }
       post('cur', { hdek: 1, type: 'goto', slide: st.slide, step: st.step, animate: true });
-      $$('li', els.list).forEach(function (li, i) { li.classList.toggle('on', i === st.slide); });
+      els.resume.style.display = resumeOffer ? '' : 'none';
+      if (resumeOffer) els.resume.textContent = T('↻ ' + (resumeOffer.slide + 1) + '번 슬라이드부터 이어서 (R)', '↻ Continue from slide ' + (resumeOffer.slide + 1) + ' (R)');
+      if (st.slide !== mediaSlide) renderMedia();
       var hint = (document.fullscreenElement || document.webkitFullscreenElement) ? '' : T('청중 창에서 F → 프로젝터 전체화면', 'Press F in the audience window → projector fullscreen');
       els.hint.textContent = hint;
     }
 
-    function buildList() {
-      els.list.querySelector('ol').innerHTML = D.slides.map(function (s, i) {
-        var mx = adapter().max(i);
-        return '<li data-i="' + i + '"><span class="n">' + (i + 1) + '</span><span class="t">' + escapeHTML(s.title) + '</span>' + (mx ? '<span class="k">' + mx + T('단계</span>', ' steps</span>') : '') + '</li>';
-      }).join('');
-    }
-
     function onClick(e) {
       var t = e.target;
-      var li = t.closest && t.closest('#list li');
-      if (li) { go(+li.dataset.i, 0, false); els.list.classList.remove('on'); return; }
-      var b = t.closest && t.closest('button[data-act]');
+      if (!t.closest || t.closest('.hdg')) return; // the overview handles its own clicks
+      var mb = t.closest('button[data-m]');
+      if (mb) { mediaCmd(+mb.closest('.mrow').dataset.i, mb.dataset.m); try { mb.blur(); } catch (x) { } return; }
+      if (t.closest('#media')) return;
+      var b = t.closest('button[data-act]');
       if (b) {
         var a = b.dataset.act;
-        if (a === 'list') { els.list.classList.toggle('on'); return; }
+        try { b.blur(); } catch (x) { }
         if (a === 'reset') { timer = { start: 0, acc: 0, running: false }; startTimer(); return; }
         if (a === 'curlive') { showCurLive = !showCurLive; store('hdek-cur-live', showCurLive ? 'on' : 'off'); build(); return; }
         if (a === 'full') {
@@ -1513,7 +1802,6 @@
         action(a);
         return;
       }
-      if (t.closest && t.closest('#list') && t.id === 'list') els.list.classList.remove('on');
       // Clicking either slide preview advances, as in PowerPoint's presenter view (not while a pen tool is on)
       if (!D.tool && e.button === 0 && Date.now() >= inkClickBlock && t.closest && t.closest('#curbox, #nxtbox')) next();
     }
@@ -1521,7 +1809,8 @@
     // Wheel over the slide previews moves back and forth; the notes keep scrolling normally
     function onWheel(e) {
       var t = e.target;
-      if (!t.closest || !t.closest('#cur, #nxt') || e.ctrlKey) return;
+      if (!t.closest || t.closest('#media, .hdg') || !t.closest('#cur, #nxt') || e.ctrlKey) return;
+      if (D.tool === 'zoom' && t.closest('#curbox')) { zoomWheel(e, previewPoint(e.clientX, e.clientY)); return; }
       e.preventDefault();
       var now = Date.now();
       if (now < wheelLock) { wheelLock = Math.max(wheelLock, now + 180); return; }
@@ -1565,7 +1854,7 @@
 
     function toolChanged() {
       if (!w || w.closed) return;
-      if (els.pink) els.pink.classList.toggle('active', !!D.tool);
+      if (els.pink) { els.pink.classList.toggle('active', !!D.tool); els.pink.classList.toggle('zoomtool', D.tool === 'zoom'); }
       $$('button[data-tool]', w.document).forEach(function (b) { b.classList.toggle('on', b.dataset.tool === D.tool); });
       $$('button[data-color]', w.document).forEach(function (b) { b.classList.toggle('on', b.dataset.color === D.color); });
     }
@@ -1578,7 +1867,8 @@
 
     return {
       open: open, close: close, update: update, renderInk: renderInkP, toolChanged: toolChanged, showGoto: showGotoP,
-      isOpen: function () { return !!(w && !w.closed); }, layout: layout, placeInk: placeInkNow
+      isOpen: function () { return !!(w && !w.closed); }, layout: layout, placeInk: placeInkNow,
+      zoom: zoomP, note: note, grid: function () { return (w && !w.closed) ? pgrid : null; }
     };
   })();
 
@@ -1590,6 +1880,9 @@
     'html,body{margin:0;height:100%;background:#0e0e11;color:#ececf0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;overflow:hidden}',
     '#app{display:grid;grid-template-rows:auto 1fr auto;height:100%}',
     '#top{display:flex;align-items:center;gap:18px;padding:10px 16px;border-bottom:1px solid #222228;background:#141418}',
+    '#top>*{flex:none;white-space:nowrap}',
+    '#top>#title,#top>#hint,#top>#note{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}',
+    '#top>.sp{flex:1 1 0}',
     '#title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:32vw;color:#b8b8c2}',
     '#num{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}',
     '#stepn{color:#8f8f9a;font-variant-numeric:tabular-nums}',
@@ -1622,33 +1915,42 @@
     '#notes .empty{color:#666}',
     '#notes.rich{white-space:normal}',
     '#bar button[data-act="color"]{min-width:30px;padding:0 6px}',
-    '#bar{display:flex;align-items:center;gap:6px;padding:8px 14px;border-top:1px solid #222228;background:#141418;flex-wrap:wrap}',
-    '#bar button{all:unset;cursor:pointer;height:36px;min-width:36px;padding:0 10px;border-radius:8px;background:#202027;color:#e5e5ea;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:14px}',
+    '#bar{display:flex;align-items:center;gap:5px;padding:8px 12px;border-top:1px solid #222228;background:#141418;flex-wrap:wrap}',
+    '#bar button{all:unset;cursor:pointer;height:36px;min-width:36px;padding:0 8px;border-radius:8px;background:#202027;color:#e5e5ea;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:14px}',
     '#bar button:hover{background:#2a2a33}',
-    '#bar button.big{min-width:96px;font-weight:700;background:#2b2b35}',
+    '#bar button.big{min-width:84px;font-weight:700;background:#2b2b35}',
     '#bar button.on{background:#0a84ff;color:#fff}',
     '#bar svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
     '#bar .sw{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.5)}',
-    '#bar .sep{width:1px;height:24px;background:#2c2c34;margin:0 6px}',
-    '#hint{color:#ffb340;font-size:13px}',
+    '#bar .sep{width:1px;height:24px;background:#2c2c34;margin:0 4px}',
+    '#hint,#note{color:#ffb340;font-size:13px}',
+    '#note{max-width:38vw}',
     '#blankst{color:#ff6961;font-weight:700}',
-    '#list{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:10}',
-    '#list.on{display:block}',
-    '#list ol{list-style:none;margin:60px auto;padding:10px;max-width:720px;max-height:calc(100% - 120px);overflow:auto;background:#17171c;border-radius:14px;box-shadow:0 20px 60px #000}',
-    '#list li{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:8px;cursor:pointer}',
-    '#list li:hover{background:#24242c}#list li.on{background:#0a84ff33}',
-    '#list .n{width:30px;text-align:right;color:#888;font-variant-numeric:tabular-nums}#list .t{flex:1}#list .k{color:#888;font-size:12px}',
+    '#resume{all:unset;cursor:pointer;padding:5px 11px;border-radius:7px;background:#0a84ff;color:#fff;font-size:13px;font-weight:600;white-space:nowrap}',
+    '.pink.zoomtool{cursor:zoom-in}',
+    '.zband{position:absolute;display:none;border:2px solid #0a84ff;background:rgba(10,132,255,.15);border-radius:3px;pointer-events:none;z-index:3}',
+    '#cur.hasmedia{padding-bottom:calc(var(--mrows) * 44px + 8px)}',
+    '#media{position:absolute;left:8px;right:8px;bottom:6px;display:flex;flex-direction:column;gap:4px}',
+    '#media:empty{display:none}',
+    '.mrow{display:flex;align-items:center;gap:6px;height:40px;padding:0 8px;background:#18181e;border:1px solid #2a2a32;border-radius:9px}',
+    '.mrow button{all:unset;cursor:pointer;height:30px;min-width:30px;padding:0 7px;box-sizing:border-box;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;background:#25252d;color:#e5e5ea;font-size:12px;font-variant-numeric:tabular-nums}',
+    '.mrow button:hover{background:#31313b}',
+    '.mrow button.on{background:#0a84ff;color:#fff}',
+    '.mrow svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}',
+    '.mrow input{flex:1;min-width:60px;accent-color:#0a84ff;cursor:pointer}',
+    '.mrow .mt{color:#b5b5be;font-size:12px;font-variant-numeric:tabular-nums;min-width:96px;text-align:center}',
+    '.mrow .mi{color:#8a8a94;font-size:12px;min-width:22px}',
     '#goto{position:fixed;right:20px;bottom:70px;padding:8px 14px;border-radius:10px;background:#0a84ff;color:#fff;font-size:18px;display:none}'
   ].join('\n');
 
   var PRESENTER_HTML = '' +
     '<div id="app">' +
-    '<div><div id="top"><span id="title"></span><span id="num"></span><span id="stepn"></span><span id="blankst"></span><span class="sp"></span>' +
+    '<div><div id="top"><span id="title"></span><span id="num"></span><span id="stepn"></span><span id="blankst"></span><button id="resume" data-act="resume" style="display:none"></button><span id="note"></span><span class="sp"></span>' +
     T('<span id="hint"></span><span class="durw">목표 <input id="dur" type="number" min="0" step="1" placeholder="분">분</span>', '<span id="hint"></span><span class="durw">Target <input id="dur" type="number" min="0" step="1" placeholder="min">min</span>') +
     T('<span id="remain"></span><span id="elapsed" title="클릭: 일시정지/재개">0:00</span><span id="clock"></span></div>', '<span id="remain"></span><span id="elapsed" title="Click: pause/resume">0:00</span><span id="clock"></span></div>') +
     '<div id="pbar"><div id="prog"></div></div></div>' +
     '<div id="main">' +
-    T('<div id="cur" class="pane"><div id="curbox" class="box"><div id="curoff">현재 화면 미리보기가 꺼져 있습니다<br>(무거운 덱에서 성능을 아끼는 모드) — 필기는 그대로 됩니다</div></div></div>', '<div id="cur" class="pane"><div id="curbox" class="box"><div id="curoff">Live preview of the current slide is off<br>(saves performance on heavy decks) — drawing still works</div></div></div>') +
+    T('<div id="cur" class="pane"><div id="curbox" class="box"><div id="curoff">현재 화면 미리보기가 꺼져 있습니다<br>(무거운 덱에서 성능을 아끼는 모드) — 필기는 그대로 됩니다</div><div id="zband" class="zband"></div></div><div id="media"></div></div>', '<div id="cur" class="pane"><div id="curbox" class="box"><div id="curoff">Live preview of the current slide is off<br>(saves performance on heavy decks) — drawing still works</div><div id="zband" class="zband"></div></div><div id="media"></div></div>') +
     '<div id="side">' +
     T('<div id="nxt" class="pane"><div id="nxtbox" class="box"><div id="endcard">마지막 슬라이드입니다</div></div></div>', '<div id="nxt" class="pane"><div id="nxtbox" class="box"><div id="endcard">This is the last slide</div></div></div>') +
     '<div id="nxtlabel"></div>' +
@@ -1661,17 +1963,18 @@
     T('<button data-act="hl" data-tool="hl" title="형광펜 (H)">', '<button data-act="hl" data-tool="hl" title="Highlighter (H)">') + svg('hl') + '</button>' +
     T('<button data-act="laser" data-tool="laser" title="레이저 (L)">', '<button data-act="laser" data-tool="laser" title="Laser (L)">') + svg('laser') + '</button>' +
     T('<button data-act="eraser" data-tool="eraser" title="지우개 (E)">', '<button data-act="eraser" data-tool="eraser" title="Eraser (E)">') + svg('eraser') + '</button>' +
+    T('<button data-act="zoom" data-tool="zoom" title="돋보기 (Z): 현재 화면에서 클릭은 2배, 드래그는 그 영역, 오른쪽 클릭은 축소">', '<button data-act="zoom" data-tool="zoom" title="Magnifier (Z): on the current slide click = 2×, drag = that area, right-click = zoom out">') + svg('zoom') + '</button>' +
     COLORS.slice(0, 4).map(function (c) { return '<button data-act="color" data-color="' + c + T('" title="색"><span class="sw" style="background:', '" title="Color"><span class="sw" style="background:') + c + '"></span></button>'; }).join('') +
     T('<button data-act="clear" title="이 슬라이드 필기 지우기 (C)">', '<button data-act="clear" title="Clear ink on this slide (C)">') + svg('clear') + '</button>' +
     '<span class="sep"></span>' +
     T('<button data-act="blank" title="검은 화면 (B)">', '<button data-act="blank" title="Black screen (B)">') + svg('blank') + '</button>' +
-    T('<button data-act="list" title="슬라이드 목록">', '<button data-act="list" title="Slide list">') + svg('list') + T('목록</button>', 'Slides</button>') +
+    T('<button data-act="grid" title="슬라이드 한눈에 보기 · 검색 (G)">', '<button data-act="grid" title="All slides · search (G)">') + svg('grid') + T('슬라이드</button>', 'Slides</button>') +
     T('<button data-act="full" title="청중 화면 전체화면 (F)">', '<button data-act="full" title="Audience fullscreen (F)">') + svg('full') + '</button>' +
     T('<button data-act="curlive" title="현재 화면 실시간 미리보기 켜기/끄기">미리보기</button>', '<button data-act="curlive" title="Toggle live preview of the current slide">Preview</button>') +
     T('<button data-act="reset" title="타이머 재시작">타이머 ↺</button>', '<button data-act="reset" title="Restart timer">Timer ↺</button>') +
     T('<button data-act="print" title="모든 단계를 펼쳐 인쇄/PDF 저장">PDF</button>', '<button data-act="print" title="Print / save PDF with every step revealed">PDF</button>') +
     '</div>' +
-    '<div id="list"><ol></ol></div><div id="goto"></div>' +
+    '<div id="goto"></div>' +
     '</div>';
 
   // ------------------------------------------------------------------ preview role
@@ -1680,6 +1983,8 @@
     var muteAll = function () { $$('video, audio').forEach(function (m) { m.muted = true; m.volume = 0; }); };
     muteAll();
     try { new MutationObserver(muteAll).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) { }
+    // only the current-slide preview plays video (following the projector); the next-slide preview and thumbnails stay still
+    if (window.name !== 'hdek-preview-cur') document.addEventListener('play', function (e) { try { e.target.pause(); } catch (x) { } }, true);
     window.addEventListener('message', function (e) {
       var d = e.data;
       if (!d || d.hdek !== 1) return;
@@ -1688,13 +1993,248 @@
       try { ok = ok || (!!window.parent.opener && e.source === window.parent.opener); } catch (x) { }
       if (!ok) return;
       if (d.type === 'goto') go(+d.slide || 0, +d.step || 0, !!d.animate);
+      if (d.type === 'zoom') {
+        var r = d.r;
+        zoomRect = (r && isFinite(r.x) && isFinite(r.y) && r.w > 0 && r.h > 0) ? { x: +r.x, y: +r.y, w: +r.w, h: +r.h } : null;
+        applyZoom(!!d.instant);
+      }
+      if (d.type === 'media' && Array.isArray(d.list) && +d.slide === D.state.slide) {
+        var ms = currentMedia();
+        d.list.forEach(function (x, i) {
+          var m = ms[i];
+          if (!m || !x || !isFinite(x.t)) return;
+          try {
+            m.muted = true;
+            if (Math.abs((m.currentTime || 0) - x.t) > (x.p ? 0.6 : 0.05)) m.currentTime = x.t;
+            if (x.p && m.paused) { var p = m.play(); if (p && p.catch) p.catch(function () { }); }
+            else if (!x.p && !m.paused) m.pause();
+          } catch (e2) { }
+        });
+      }
     });
     window.addEventListener('keydown', function (e) {
       if (e.__hdek || !e.isTrusted) return; // never echo our own synthetic keys back
       try { window.parent.postMessage({ hdek: 1, type: 'key', key: e.key, shiftKey: e.shiftKey }, '*'); } catch (x) { }
     });
-    window.addEventListener('resize', fit);
+    window.addEventListener('resize', function () { fit(); if (zoomRect) applyZoom(true); });
     try { window.parent.postMessage({ hdek: 1, type: 'ready', count: adapter().count() }, '*'); } catch (e) { }
+  }
+
+  // ------------------------------------------------------------------ shared helpers: size, media
+  function slideAspect() {
+    if (D.mode === 'reveal') { var c = window.Reveal.getConfig(); return { w: c.width || 960, h: c.height || 700 }; }
+    if (D.staged) return { w: D.width, h: D.height };
+    return { w: window.innerWidth || 1280, h: window.innerHeight || 720 };
+  }
+  function deckURL() {
+    if (window.__HDEK_SRC__) return window.__HDEK_SRC__;
+    return location.href.replace(/#.*$/, '');
+  }
+  // video and audio on the current slide (in the order they appear)
+  function currentMedia() {
+    var s = D.slides[D.state.slide];
+    if (!s || !s.el) return [];
+    return $$('video, audio', s.el).filter(function (m) { return !!(m.currentSrc || m.src || m.querySelector('source')); });
+  }
+  function togglePlay(m) {
+    if (!m) return;
+    if (!m.paused && !m.ended) { m.pause(); return; }
+    var fail = function (err) {
+      if (!err || err.name !== 'NotAllowedError' || m.muted) return;
+      // the browser blocks sound until the audience window has been used once: play silently and say so
+      m.muted = true;
+      try { var p2 = m.play(); if (p2 && p2.catch) p2.catch(function () { }); } catch (x) { }
+      var msg = T('브라우저가 소리를 막아 소리 없이 재생합니다. 청중 창에서 아무 키나 한 번 누른 뒤 🔊 를 누르세요', 'The browser blocked sound, so the video plays muted. Press any key once in the audience window, then press 🔊');
+      Presenter.note(msg); toast(msg, 5000);
+    };
+    try { var p = m.play(); if (p && p.catch) p.catch(fail); } catch (e) { fail(e); }
+  }
+
+  // ------------------------------------------------------------------ slide overview: thumbnails + search
+  var audGrid = null;
+  var BLOCK_RE = /^(P|DIV|LI|UL|OL|H[1-6]|SECTION|ARTICLE|ASIDE|HEADER|FOOTER|FIGURE|FIGCAPTION|TABLE|THEAD|TBODY|TR|TD|TH|BLOCKQUOTE|PRE|DT|DD|DL|MAIN|NAV|LABEL|BUTTON|SVG|TEXT)$/i;
+  // the slide's visible text for search: words in different blocks stay apart, notes/scripts/styles are left out
+  function searchText(el) {
+    var out = '', last = null, skip = 'script, style, template, noscript, ' + NOTES_SEL;
+    var tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (var n = tw.nextNode(); n; n = tw.nextNode()) {
+      if (n.nodeType === 1) { if (n.tagName === 'BR') out += ' '; continue; }
+      var p = n.parentElement;
+      if (!p || p.closest(skip)) continue;
+      var b = p; while (b && b !== el && !BLOCK_RE.test(b.tagName)) b = b.parentElement;
+      if (b !== last) { out += ' '; last = b; }
+      out += n.nodeValue;
+    }
+    return out.replace(/\s+/g, ' ').trim();
+  }
+  function SlideGrid(doc, mount, win) {
+    var root = null, list = null, q = null, nEl = null, cards = [], frames = [], waiting = [], loading = 0, sel = -1, io = null, hay = null, a = null;
+    function haystack() {
+      if (hay) return hay;
+      var norm = function (s) { return (s.normalize ? s.normalize('NFC') : s); };
+      hay = D.slides.map(function (s) {
+        var notes = '', body = '';
+        try { notes = textOf(new DOMParser().parseFromString(s.notesHTML || '', 'text/html').body); } catch (e) { }
+        try { body = searchText(s.el); } catch (e) { body = textOf(s.el); }
+        if (body.indexOf(s.title) === 0) body = body.slice(s.title.length).trim(); // the heading is already the card's caption
+        var text = norm((s.title + ' · ' + body + (notes ? ' · ' + notes : '')).replace(/\s+/g, ' '));
+        return { text: text, low: text.toLowerCase(), skip: s.title.length + 3 };
+      });
+      return hay;
+    }
+    function open() {
+      if (root) return;
+      a = slideAspect();
+      root = doc.createElement('div'); root.className = 'hdg';
+      root.innerHTML = '<div class="hdg-top"><input class="hdg-q" type="search" autocomplete="off" spellcheck="false" placeholder="' +
+        T('찾을 말 (제목 · 본문 · 노트) 또는 슬라이드 번호', 'Search titles, text and notes, or type a slide number') + '"><span class="hdg-n"></span><span class="hdg-sp"></span>' +
+        '<button class="hdg-x">' + T('닫기 (Esc)', 'Close (Esc)') + '</button></div><div class="hdg-cards"></div>';
+      mount.appendChild(root);
+      q = root.querySelector('.hdg-q'); list = root.querySelector('.hdg-cards'); nEl = root.querySelector('.hdg-n');
+      cards = D.slides.map(function (s, i) {
+        var c = doc.createElement('div');
+        c.className = 'hdg-card' + (i === D.state.slide ? ' now' : '');
+        c.dataset.i = String(i);
+        c.innerHTML = '<div class="hdg-th" style="aspect-ratio:' + a.w + ' / ' + a.h + '"><div class="hdg-ph">' + escapeHTML(s.title) + '</div></div>' +
+          '<div class="hdg-cap"><b>' + (i + 1) + '</b><span>' + escapeHTML(s.title) + '</span></div><div class="hdg-snip"></div>';
+        list.appendChild(c);
+        return c;
+      });
+      list.addEventListener('click', function (e) { var c = e.target.closest && e.target.closest('.hdg-card'); if (c) pick(+c.dataset.i); });
+      root.querySelector('.hdg-x').addEventListener('click', close);
+      q.addEventListener('input', filter);
+      win.addEventListener('message', onMsg);
+      win.addEventListener('resize', scale);
+      // thumbnails load only when they scroll into view, a few at a time
+      try {
+        io = new win.IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) want(+en.target.dataset.i); }); }, { root: list, rootMargin: '300px 0px' });
+        cards.forEach(function (c) { io.observe(c); });
+      } catch (e) { io = null; }
+      filter();
+      select(D.state.slide);
+      scale();
+      try { cards[D.state.slide].scrollIntoView({ block: 'center' }); } catch (e) { }
+      setTimeout(function () { try { q.focus(); } catch (e) { } }, 0);
+    }
+    function close() {
+      if (!root) return;
+      if (io) io.disconnect();
+      frames.forEach(function (f) { if (f) clearTimeout(f.timer); });
+      try { root.remove(); } catch (e) { }
+      root = null; frames = []; waiting = []; loading = 0; cards = []; sel = -1; io = null;
+      win.removeEventListener('message', onMsg);
+      win.removeEventListener('resize', scale);
+    }
+    function scale() {
+      if (!root) return;
+      var th = null;
+      for (var i = 0; i < cards.length && !th; i++) if (!cards[i].hidden) th = cards[i].firstChild;
+      if (th && th.clientWidth) list.style.setProperty('--hdg-s', String(th.clientWidth / a.w));
+    }
+    function want(i) {
+      if (frames[i] || waiting.indexOf(i) >= 0) return;
+      waiting.push(i); pump();
+    }
+    function pump() {
+      while (root && loading < 3 && waiting.length) {
+        var i = waiting.shift();
+        if (frames[i] || !cards[i] || cards[i].hidden) continue;
+        var f = doc.createElement('iframe');
+        f.name = 'hdek-preview-thumb';
+        f.setAttribute('tabindex', '-1'); f.setAttribute('aria-hidden', 'true');
+        f.style.width = a.w + 'px'; f.style.height = a.h + 'px'; f.style.transform = 'scale(var(--hdg-s, .1))';
+        if (window.__HDEK_SRCDOC__) f.srcdoc = window.__HDEK_SRCDOC__; else f.src = deckURL();
+        var rec = frames[i] = { f: f, done: false };
+        rec.timer = setTimeout(done.bind(null, i), 8000);
+        loading++;
+        cards[i].firstChild.appendChild(f);
+      }
+    }
+    function done(i) {
+      var r = frames[i];
+      if (!r || r.done) return;
+      r.done = true; clearTimeout(r.timer); loading = Math.max(0, loading - 1);
+      pump();
+    }
+    function onMsg(e) {
+      var d = e.data;
+      if (!d || d.hdek !== 1 || d.type !== 'ready') return;
+      for (var i = 0; i < frames.length; i++) {
+        var r = frames[i];
+        if (r && r.f.contentWindow === e.source) {
+          // each thumbnail shows the slide with every step revealed, as it will look after a jump
+          try { r.f.contentWindow.postMessage({ hdek: 1, type: 'goto', slide: i, step: adapter().max(i), animate: false }, '*'); } catch (x) { }
+          (function (f) { setTimeout(function () { f.classList.add('on'); }, 250); })(r.f);
+          done(i);
+          return;
+        }
+      }
+    }
+    function snippet(h, toks) {
+      var at = -1;
+      toks.forEach(function (t) { var p = h.low.indexOf(t, h.skip); if (p >= 0 && (at < 0 || p < at)) at = p; });
+      if (at < 0) return '';
+      var from = Math.max(h.skip, at - 28), to = Math.min(h.text.length, at + 72);
+      if (from > h.skip) { var sp = h.text.indexOf(' ', from); if (sp >= 0 && sp < at) from = sp + 1; } // start on a word
+      var part = (from > h.skip ? '…' : '') + h.text.slice(from, to) + (to < h.text.length ? '…' : '');
+      var re = new RegExp('(' + toks.map(function (t) { return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')', 'gi');
+      return part.split(re).map(function (x, k) { return k % 2 ? '<mark>' + escapeHTML(x) + '</mark>' : escapeHTML(x); }).join('');
+    }
+    function filter() {
+      if (!root) return;
+      var raw = q.value || '';
+      if (raw.normalize) raw = raw.normalize('NFC');
+      var toks = raw.toLowerCase().split(/\s+/).filter(Boolean), H = toks.length ? haystack() : null, shown = 0, first = -1;
+      var num = toks.length === 1 && /^\d+$/.test(toks[0]) ? +toks[0] - 1 : -1;
+      cards.forEach(function (c, i) {
+        var ok = !toks.length || i === num || toks.every(function (t) { return H[i].low.indexOf(t) >= 0; });
+        c.hidden = !ok;
+        c.lastChild.innerHTML = ok && toks.length ? snippet(H[i], toks) : '';
+        if (ok) { shown++; if (first < 0) first = i; }
+      });
+      var none = list.querySelector('.hdg-none');
+      if (!shown && !none) { none = doc.createElement('div'); none.className = 'hdg-none'; none.textContent = T('찾는 말이 있는 슬라이드가 없습니다', 'No slide matches'); list.appendChild(none); }
+      if (shown && none) none.remove();
+      nEl.textContent = toks.length ? T(shown + '장 찾음', shown + ' found') : T(cards.length + '장', cards.length + ' slides');
+      if (toks.length) select(num >= 0 && cards[num] ? num : first);
+      scale();
+      if (!io) return;
+      // cards revealed by the filter: load the ones on screen
+      cards.forEach(function (c, i) { if (!c.hidden && !frames[i]) { var r = c.getBoundingClientRect(), lr = list.getBoundingClientRect(); if (r.bottom > lr.top - 300 && r.top < lr.bottom + 300) want(i); } });
+    }
+    function select(i) {
+      if (sel >= 0 && cards[sel]) cards[sel].classList.remove('sel');
+      sel = i;
+      if (i >= 0 && cards[i]) { cards[i].classList.add('sel'); try { cards[i].scrollIntoView({ block: 'nearest' }); } catch (e) { } }
+    }
+    function visible() { var v = []; cards.forEach(function (c, i) { if (!c.hidden) v.push(i); }); return v; }
+    function cols() { try { return Math.max(1, win.getComputedStyle(list).gridTemplateColumns.split(' ').filter(Boolean).length); } catch (e) { return 1; } }
+    function move(d) {
+      var v = visible(); if (!v.length) return;
+      var p = v.indexOf(sel);
+      select(v[clamp(p < 0 ? 0 : p + d, 0, v.length - 1)]);
+    }
+    function pick(i) {
+      close();
+      // jump to the slide as the thumbnail showed it: every step revealed
+      go(i, adapter().max(i), false);
+    }
+    function key(e) {
+      var k = e.key, stop = true;
+      if (k === 'Escape') close();
+      else if (k === 'Enter') { var v = visible(); if (sel >= 0 && v.indexOf(sel) >= 0) pick(sel); else if (v.length) pick(v[0]); }
+      else if (k === 'ArrowRight' || k === 'PageDown') move(1);
+      else if (k === 'ArrowLeft' || k === 'PageUp') move(-1);
+      else if (k === 'ArrowDown') move(cols());
+      else if (k === 'ArrowUp') move(-cols());
+      else {
+        stop = false;
+        // typing goes to the search box
+        try { if (q && q.getRootNode().activeElement !== q && !e.ctrlKey && !e.metaKey && !e.altKey) q.focus(); } catch (x) { }
+      }
+      if (stop) { e.preventDefault(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); }
+    }
+    return { open: open, close: close, key: key, isOpen: function () { return !!root; } };
   }
 
   // ------------------------------------------------------------------ init
@@ -1741,15 +2281,33 @@
     finishInit();
   }
 
+  // "Continue where you stopped": the position is saved on every move; reopening the deck offers it (R) instead of jumping there
+  var resumeOffer = null;
+  function savedPos() {
+    try {
+      var p = JSON.parse(store('hdek-pos:' + deckKey()) || 'null');
+      return p && typeof p.slide === 'number' && p.slide >= 0 ? { slide: p.slide | 0, step: (p.step | 0) || 0, t: p.t || 0 } : null;
+    } catch (e) { return null; }
+  }
+  function offerResume(last) {
+    var n = adapter().count();
+    if (!last || D.state.slide !== 0 || D.state.step !== 0 || last.slide <= 0 || last.slide >= n - 1) return;
+    resumeOffer = { slide: last.slide, step: Math.min(last.step, adapter().max(last.slide)), from: D.state.slide };
+    store('hdek-pos:' + deckKey(), JSON.stringify(last)); // keep it until the talk actually moves
+    toast(T('지난번 ' + (last.slide + 1) + '번 슬라이드에서 멈췄습니다 · R 을 누르면 거기서 이어서 시작합니다', 'You stopped at slide ' + (last.slide + 1) + ' last time · press R to continue there'), 7000);
+  }
+
   function finishInit() {
     D.ready = true;
     if (ROLE === 'preview') { setupPreview(); return; }
+    var last = savedPos();
     setupUI();
     setupInk();
     bindInput();
     loadScreens(false);
     fit();
     afterChange(true);
+    offerResume(last);
     document.documentElement.setAttribute('data-hdek-mode', D.mode);
     console.info('[' + PRODUCT + ' ' + VERSION + '] mode=' + D.mode + ' slides=' + adapter().count() + (D.staged ? ' stage=' + D.width + 'x' + D.height : ''));
   }

@@ -1,4 +1,4 @@
-/*! DeckWright core v0.3.3 | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright core v0.3.4 | MIT License | https://github.com/grotyx/deckwright
  *  Shared by player.html (browser) and the CLI (Node):
  *  runtime injection, local asset inlining, .hdek (ZIP) read/write, manifest, static checks.
  */
@@ -429,7 +429,7 @@
     var code = runtimeSrc.replace(/<\/script/gi, '<\\/script');
     var tag = '<script data-hdek-runtime>\n' + code + '\n</script>';
     // remove any existing runtime (external reference or older version) and insert the current one
-    html = html.replace(/<script\b[^>]*\bdata-hdek-runtime\b[^>]*>[\s\S]*?<\/script\s*>/gi, '');
+    html = html.replace(/<script\b[^>]*\bdata-hdek-runtime\b[^>]*>[\s\S]*?<\/script\s*>\n?/gi, '');
     if (extraHead) {
       if (/<\/head>/i.test(html)) html = html.replace(/<\/head>/i, function () { return extraHead + '\n</head>'; });
       else html = extraHead + html;

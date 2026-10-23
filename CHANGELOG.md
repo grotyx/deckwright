@@ -4,6 +4,15 @@ English · [한국어](CHANGELOG.ko.md)
 
 Versions follow SemVer. Dates are YYMMDD.
 
+### v0.3.4 (261023)
+
+- Video from the presenter view: when the current slide has a video or audio, controls appear under the current-slide preview (play/pause, back and forward 10 s, position, time, sound). They play the projector's video; the preview follows silently and the next-slide preview stays still. `K` plays or pauses from either window. If the browser blocks sound, the video plays muted and the presenter view says how to turn it on.
+- Magnifier (`Z`, or the magnifier button): click to zoom 2× around a point, drag a box to fill the screen with a table or figure, wheel to zoom at the pointer, right-click to zoom out. Works on the projector window and on the presenter's current preview, and both show the same zoom; pen and laser still work while zoomed. `Esc`, `Z` or the next slide zooms back out.
+- All slides at a glance (`G`, or *Slides* in the presenter view, which replaces the text list): live thumbnails of every slide and a search box over titles, slide text and notes, or a slide number. `Enter` or a click goes there with every step revealed, as the thumbnail shows. Thumbnails load only as they scroll into view.
+- Continue where you stopped: the position is remembered in every mode. Reopening a deck starts on slide 1 and offers `R` (a button in the presenter view) to jump back to where the talk stopped.
+- `deckwright update [folder]` puts the current runtime into older DeckWright files (`_DeckWright.html`, `_single.html`, `deckwright-runtime.js`); `--dry-run` only lists them.
+- The presenter's top and bottom bars no longer wrap with a long deck title on a 1280-pixel screen.
+
 ### v0.3.3 (261022)
 
 - A click anywhere on the slide moves forward, also in decks that have their own "left side = back" click zones. Right-click and wheel-up go back (wheel-down forward), in the audience window and on the presenter's previews. Buttons and links in the deck keep working.

@@ -14,7 +14,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const Core = require(path.join(ROOT, 'core', 'deckwright-core.js'));
 const RUNTIME_PATH = path.join(ROOT, 'runtime', 'deckwright-runtime.js');
-const VERSION = '0.3.3';
+const VERSION = '0.3.4';
 
 // Messages follow the system locale (Korean if the locale starts with "ko"); override with DECKWRIGHT_LANG=ko|en
 const LANG = (() => {
@@ -33,6 +33,7 @@ function usage() {
 
 사용법:
   deckwright inject <파일.html> [-o 출력.html] 원본 옆에 두는 발표용 HTML (런타임만 넣고 그림·영상은 원래 폴더 참조)
+  deckwright update [폴더…] [--dry-run]       폴더 안 DeckWright 파일(_DeckWright.html, _single.html 등)을 최신 런타임으로 바꾸기
   deckwright build  <입력> [-o 출력.html]     런타임과 모든 자원을 넣은 단독 HTML 한 개 (기본: <이름>_single.html)
   deckwright pack   <입력> [-o 출력.hdek]     ZIP 패키지(.hdek)로 묶기 (큰 영상이 많을 때)
   deckwright unpack <파일.hdek> [-o 폴더]     패키지 풀기
@@ -48,6 +49,7 @@ function usage() {
 
 Usage:
   deckwright inject <file.html> [-o out.html] Presentable HTML next to the original (runtime only; images/video stay in place)
+  deckwright update [folder…] [--dry-run]     Bring every DeckWright file in a folder (_DeckWright.html, _single.html …) to the current runtime
   deckwright build  <input> [-o out.html]     One self-contained HTML with the runtime and every asset inlined (default: <name>_single.html)
   deckwright pack   <input> [-o out.hdek]     ZIP package (.hdek), better for decks with large videos
   deckwright unpack <file.hdek> [-o dir]      Extract a package
@@ -222,6 +224,51 @@ async function cmdInject(a) {
   if (fontReport) printFonts(fontReport);
 }
 
+// update: put the current runtime into files that already have one (inject/build outputs, *-runtime.js copies)
+const RUNTIME_VER_RE = /(?:DeckWright|HDeck) runtime v(\d+\.\d+\.\d+)/;
+async function cmdUpdate(a) {
+  const targets = a._.length ? a._ : ['.'];
+  const files = [];
+  const walk = (p, depth) => {
+    let st; try { st = fs.lstatSync(p); } catch { return; }
+    if (st.isSymbolicLink()) return;
+    if (st.isDirectory()) {
+      if (depth > 12) return;
+      for (const n of fs.readdirSync(p)) { if (!n.startsWith('.') && n !== 'node_modules') walk(path.join(p, n), depth + 1); }
+      return;
+    }
+    if (/\.html?$/i.test(p) || RUNTIME_FILE_RE.test(p)) files.push(p);
+  };
+  for (const x of targets) {
+    if (!fs.existsSync(x)) throw new Error(t('파일이나 폴더가 없습니다: ', 'File or folder not found: ') + x);
+    walk(path.resolve(x), 0);
+  }
+  const src = runtimeSrc(), dry = !!a['dry-run'];
+  let updated = 0, current = 0;
+  for (const f of files) {
+    const rel = path.relative(process.cwd(), f) || f;
+    let text, old, out;
+    if (RUNTIME_FILE_RE.test(f)) {
+      text = fs.readFileSync(f, 'utf8');
+      const m = RUNTIME_VER_RE.exec(text.slice(0, 400)); if (!m) continue;
+      old = m[1]; out = src;
+    } else {
+      const dec = Core.decodeHTML(new Uint8Array(fs.readFileSync(f)));
+      if (!Core.hasRuntime(dec.html)) continue;
+      const m = /<script\b[^>]*\bdata-hdek-runtime\b[^>]*>\s*\/\*!\s*(?:DeckWright|HDeck) runtime v(\d+\.\d+\.\d+)/i.exec(dec.html) || RUNTIME_VER_RE.exec(dec.html);
+      old = m ? m[1] : '?'; out = Core.injectRuntime(dec.html, src);
+    }
+    if (old === VERSION) { current++; continue; }
+    if (!dry) fs.writeFileSync(f, out);
+    updated++;
+    console.log(`${C.g}✓${C.x} ${rel} ${C.d}(${old} → ${VERSION})${C.x}`);
+  }
+  const msg = dry ? t(`바꿀 파일 ${updated}개 (실제로 바꾸지 않음, --dry-run)`, `${updated} file(s) would be updated (nothing written, --dry-run)`)
+    : t(`${updated}개 파일을 ${VERSION} 으로 바꿨습니다`, `Updated ${updated} file(s) to ${VERSION}`);
+  console.log(`${updated ? '' : C.d}${msg}${current ? t(` · 이미 최신 ${current}개`, ` · ${current} already current`) : ''}${C.x}`);
+  if (!updated && !current) console.log(`${C.d}${t('DeckWright 런타임이 들어 있는 파일을 찾지 못했습니다', 'No files with the DeckWright runtime were found')}${C.x}`);
+}
+
 async function cmdPack(a) {
   const inp = await loadInput(a._[0], a);
   const read = readerFor(inp);
@@ -390,6 +437,7 @@ async function main() {
     case 'build': return cmdBuild(a);
     case 'pack': return cmdPack(a);
     case 'inject': return cmdInject(a);
+    case 'update': return cmdUpdate(a);
     case 'unpack': return cmdUnpack(a);
     case 'check': return cmdCheck(a);
     case 'export': return cmdExport(a);

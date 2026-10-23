@@ -26,7 +26,8 @@ Run the CLI as `node <skill>/scripts/deckwright.mjs <command> …`, where `<skil
 
 1. `node <skill>/scripts/deckwright.mjs check <deck.html or folder>` to see what it detects (slides, external assets).
 2. `node <skill>/scripts/deckwright.mjs inject <deck.html>` (add `--fetch-fonts` when `check` reports web fonts) writes `<name>_DeckWright.html` next to the original. It only adds the runtime; images and videos still load from the original folder, and the original file is not touched. This is the lightest option and the right default.
-3. If the user wants one file to email or carry on USB: `build <input>` (inlines all assets; writes `<name>_single.html` next to the input). If the deck has large videos (>50 MB total): `pack <input> -o talk.hdek` and open it with `player.html`.
+3. If the user updated DeckWright and has older presentation files (or asks to "update" their decks): `node <skill>/scripts/deckwright.mjs update <folder>` puts the current runtime into every `_DeckWright.html` / `_single.html` under that folder (`--dry-run` lists them first). Nothing else in the files changes.
+4. If the user wants one file to email or carry on USB: `build <input>` (inlines all assets; writes `<name>_single.html` next to the input). If the deck has large videos (>50 MB total): `pack <input> -o talk.hdek` and open it with `player.html`.
 
 The runtime auto-detects decks without the contract: decks with their own navigation engine are driven through that engine (their animations are kept), stacked fixed-size slides are scaled to fit, reveal.js decks are recognized, and `.notes` / `aside.notes` become speaker notes. Never rewrite the user's deck just to add DeckWright unless they ask.
 
@@ -80,4 +81,4 @@ The runtime auto-detects decks without the contract: decks with their own naviga
 
 ## Keys while presenting (tell the user)
 
-`→ / Space / PageDown / click / wheel` next · `← / PageUp` back · number + `Enter` jump · `S` presenter view · `F` fullscreen (moves to a second screen when the browser allows) · `B` / `W` black / white screen · `D` pen, `H` highlighter, `L` laser, `E` eraser, `C` clear ink · `?` all shortcuts. The UI follows the browser language (Korean or English); force it with `?hdek-lang=en` or `data-hdek-lang="ko"` on the root.
+`→ / Space / PageDown / click / wheel down` next · `← / PageUp / right-click / wheel up` back · number + `Enter` jump · `G` all slides with search (titles, text, notes) · `R` continue where you stopped (offered right after reopening) · `Z` magnifier (click 2×, drag an area, right-click out) · `K` play/pause the slide's video (the presenter view also has video controls under the current slide) · `S` presenter view · `F` fullscreen (moves to a second screen when the browser allows) · `B` / `W` black / white screen · `D` pen, `H` highlighter, `L` laser, `E` eraser, `C` clear ink · `?` all shortcuts. The UI follows the browser language (Korean or English); force it with `?hdek-lang=en` or `data-hdek-lang="ko"` on the root.

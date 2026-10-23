@@ -1,6 +1,6 @@
 # DeckWright user guide
 
-English · [한국어](manual.ko.md) · v0.3.3
+English · [한국어](manual.ko.md) · v0.3.4
 
 This guide walks through a talk from start to finish: installing, turning an HTML deck into one you can present, presenting with a second screen, writing on slides, and making the files a conference asks for.
 
@@ -40,6 +40,8 @@ deckwright inject talk.html     # writes talk_DeckWright.html next to talk.html
 ```
 
 `inject` copies the deck and adds the runtime. Images and video still load from the original folder, so keep the new file next to the old one. `talk.html` itself is never changed.
+
+**After updating DeckWright.** Files you made earlier keep the runtime they were made with. To bring a whole folder of talks up to date, run `deckwright update <folder>` (add `--dry-run` to only list them). It replaces the runtime inside every `_DeckWright.html` and `_single.html` it finds and leaves everything else as it was. From the chat, say "update my DeckWright decks in this folder".
 
 You do not need to rewrite the deck. DeckWright recognizes:
 
@@ -82,9 +84,17 @@ Open the file in Chrome, Edge, Firefox or Safari.
 
 ![Presenter view](images/en/presenter.png)
 
-The presenter view shows the current slide, the next step (or the next slide), your notes with *A−* / *A+* to resize them, elapsed time, time remaining against `data-duration`, and the clock. *Slides* opens the slide list; click one to jump there. Typing a number and `Enter` jumps too.
+The presenter view shows the current slide, the next step (or the next slide), your notes with *A−* / *A+* to resize them, elapsed time, time remaining against `data-duration`, and the clock. Typing a number and `Enter` jumps to that slide.
 
-![Slide list](images/en/slide-list.png)
+**All slides and search.** *Slides* (or `G`) shows every slide as a thumbnail. Type a word to find it in titles, slide text and notes, or type a slide number; `Enter` or a click jumps there with every step already revealed, as the thumbnail shows. This is the quick way back to "that table" during questions. `G` pressed in the presenter view opens it there; pressed in the slide window, it opens on the projector.
+
+![All slides](images/en/overview.png)
+
+**Video.** When the current slide has a video (or audio), controls appear under the current-slide preview: play / pause, back and forward 10 seconds, a position bar, the time and sound on / off. They act on the projector, and the preview follows silently. `K` plays or pauses the video on the slide from either window. Chrome and Edge may hold back sound until the slide window has had a key press or click; if so, the video starts muted and the presenter view says what to do.
+
+**Magnifier.** Press `Z` (or the magnifier button), then click a spot to zoom 2× around it, or drag a box around a table or figure to fill the screen with it. The wheel zooms in and out at the pointer; right-click zooms out. Do it on the slide window or on the presenter's current-slide preview; both show the same zoom, and the pen and laser still work while zoomed. `Esc`, `Z` again or moving to another slide zooms back out.
+
+**Continue where you stopped.** DeckWright remembers the last slide. If the browser closes mid-talk, open the file again: it starts on slide 1 and offers "press R to continue at slide 12" (also as a button in the presenter view). Press `R`, or just start presenting and the offer goes away.
 
 | Action | Keys |
 |---|---|
@@ -93,9 +103,13 @@ The presenter view shows the current slide, the next step (or the next slide), y
 | Presenter view | `S` |
 | Fullscreen | `F` (a clicker's `F5` does the same) |
 | Black / white screen | `B` or `.` / `W` or `,` |
+| All slides · search | `G` |
+| Continue where you stopped | `R` (right after opening) |
+| Magnifier | `Z`, then click / drag / wheel; right-click zooms out |
+| Play / pause video | `K` |
 | Pen, highlighter, laser, eraser | `D`, `H`, `L`, `E` |
 | Clear ink on this slide / everywhere | `C` / `Shift+C` |
-| Tool off | `Esc` |
+| Tool off, zoom off | `Esc` |
 | All shortcuts | `?` |
 
 ![Shortcut help](images/en/help.png)
@@ -158,3 +172,7 @@ Without the player, rename `talk.hdek` to `talk.zip`, extract it and double-clic
 **`build` says "Outside the deck folder, not included".** The deck points at a file above its own folder (`../images/x.png`). DeckWright never reads outside the deck folder, so nothing private is swept into a file you share. Move the file into the deck folder, or name the shared parent with `--root`: `deckwright build talk/ --root .`
 
 **The previews make the laptop slow.** Press *Preview* in the presenter view to turn off the live current-slide preview.
+
+**A video plays without sound.** The browser blocks sound until the slide window has been used. Press any key or click once in the slide window, then press the sound button under the preview. Videos the deck itself marks `muted` also start silent; the same button turns their sound on.
+
+**An older talk lacks the newest features.** Each file carries the runtime it was made with. Run `deckwright update <folder>` to refresh every DeckWright file in that folder.
