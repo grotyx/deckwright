@@ -4,6 +4,18 @@ English · [한국어](CHANGELOG.ko.md)
 
 Versions follow SemVer. Dates are YYMMDD.
 
+### v0.3.5 (261023)
+
+Fixes from an independent review of 0.3.4; each has a regression test (127 checks).
+
+- The slide overview no longer lets clicks, typing or the wheel reach the deck underneath. Decks with their own click or key handlers could move on their own, or show two slides at once.
+- `deckwright update` no longer touches `player.html` (which only mentions the runtime tag in its code) and could no longer corrupt it.
+- The magnifier on a scrolled page zooms where you clicked, keeps the toolbar on screen and restores the scroll afterwards.
+- The overview keeps only thumbnails near the screen loaded and gives heavy decks (large inline videos) fewer of them, so a long deck no longer fills memory.
+- The toolbar's "all slides" button in the audience window opens there even while the presenter view is open.
+- Ink on large high-resolution screens is drawn at full resolution again; the size limit applies only to the zoomed presenter canvas.
+- `K` is left to the deck on slides without a video.
+
 ### v0.3.4 (261023)
 
 - Video from the presenter view: when the current slide has a video or audio, controls appear under the current-slide preview (play/pause, back and forward 10 s, position, time, sound). They play the projector's video; the preview follows silently and the next-slide preview stays still. `K` plays or pauses from either window. If the browser blocks sound, the video plays muted and the presenter view says how to turn it on.

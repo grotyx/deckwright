@@ -14,7 +14,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const Core = require(path.join(ROOT, 'core', 'deckwright-core.js'));
 const RUNTIME_PATH = path.join(ROOT, 'runtime', 'deckwright-runtime.js');
-const VERSION = '0.3.4';
+const VERSION = '0.3.5';
 
 // Messages follow the system locale (Korean if the locale starts with "ko"); override with DECKWRIGHT_LANG=ko|en
 const LANG = (() => {
@@ -254,9 +254,10 @@ async function cmdUpdate(a) {
       old = m[1]; out = src;
     } else {
       const dec = Core.decodeHTML(new Uint8Array(fs.readFileSync(f)));
-      if (!Core.hasRuntime(dec.html)) continue;
-      const m = /<script\b[^>]*\bdata-hdek-runtime\b[^>]*>\s*\/\*!\s*(?:DeckWright|HDeck) runtime v(\d+\.\d+\.\d+)/i.exec(dec.html) || RUNTIME_VER_RE.exec(dec.html);
-      old = m ? m[1] : '?'; out = Core.injectRuntime(dec.html, src);
+      // only a real runtime script tag counts: the player (and DeckWright's own tools) merely mention one in their code
+      const m = /<script\b[^>]*\bdata-hdek-runtime\b[^>]*>\s*\/\*!\s*(?:DeckWright|HDeck) runtime v(\d+\.\d+\.\d+)/i.exec(dec.html);
+      if (!m || /function injectRuntime\b|id="hdek-player"|<title>[^<]*DeckWright player/i.test(dec.html)) continue;
+      old = m[1]; out = Core.injectRuntime(dec.html, src);
     }
     if (old === VERSION) { current++; continue; }
     if (!dry) fs.writeFileSync(f, out);

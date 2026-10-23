@@ -303,6 +303,59 @@ with sync_playwright() as pw:
     pp.keyboard.press('Enter'); pp.wait_for_timeout(300)
     check('picking in the presenter overview moves the projector', ms() == [3, 0], ms())
     check('v0.3.4 features: no page errors', not errors, errors)
+    # the audience toolbar's overview button opens on the projector even while the presenter view is open
+    pg.evaluate(sr + ".querySelector('.hdek-bar button[data-act=grid]').click()"); pg.wait_for_timeout(300)
+    check('toolbar "all slides" opens on the audience screen with the presenter open', pg.evaluate(sr + ".querySelector('.hdg') !== null") and pp.locator('.hdg').count() == 0)
+    pg.keyboard.press('Escape')
+    ctx.close()
+
+    # v0.3.5 (review): the overview must not leak clicks, typing or the wheel to a deck with its own handlers
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(built('ai-click'))); pg.wait_for_timeout(800)
+    prog = lambda: pg.evaluate("document.querySelector('.progress').style.width")
+    p0 = prog(); pg.keyboard.press('g'); pg.wait_for_timeout(800)
+    pg.keyboard.type('a b'); pg.mouse.move(640, 400); pg.mouse.wheel(0, 300); pg.wait_for_timeout(300)
+    p1 = prog()
+    pg.evaluate("document.querySelector('.hdek-ui-host').shadowRoot.querySelector('.hdg-q').value=''")
+    pg.evaluate("document.querySelector('.hdek-ui-host').shadowRoot.querySelectorAll('.hdg-card')[2].click()"); pg.wait_for_timeout(400)
+    act = pg.evaluate("[...document.querySelectorAll('.slide')].map((s,i)=>s.classList.contains('active')?i:-1).filter(i=>i>=0)")
+    check('overview: typing, wheel and clicks never reach the deck underneath', p0 == p1 and len(act) <= 1 and pg.evaluate('DeckWright.state().slide') == 2, (p0, p1, act, pg.evaluate('DeckWright.state().slide')))
+    ctx.close()
+
+    # v0.3.5 (review): zoom on a scrolled page lands on the clicked point, toolbar stays on screen, scroll comes back
+    longp = os.path.join(TMP, 'long.html')
+    with open(longp, 'w') as f:
+        f.write('<!doctype html><title>Long</title><body style="margin:0;height:4000px;font:20px sans-serif"><p>A long page</p>'
+                '<div id="mk" style="position:absolute;left:600px;top:2040px;width:40px;height:40px;background:red"></div>'
+                '<script src="' + os.path.join(ROOT, 'skills/deckwright/runtime/deckwright-runtime.js') + '" data-hdek-runtime></script></body>')
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(longp)); pg.wait_for_timeout(600); pg.evaluate('scrollTo(0, 1690)'); pg.wait_for_timeout(100)
+    pg.keyboard.press('z'); pg.mouse.click(620, 370); pg.wait_for_timeout(500)
+    mk = pg.evaluate("(r=>[r.x+r.width/2, r.y+r.height/2])(mk.getBoundingClientRect())")
+    pg.mouse.move(200, 700); pg.wait_for_timeout(200)
+    barb = pg.evaluate("document.querySelector('.hdek-ui-host').shadowRoot.querySelector('.hdek-bar').getBoundingClientRect().bottom")
+    pg.keyboard.press('Escape'); pg.wait_for_timeout(300)
+    check('zoom on a scrolled page: the clicked point is centred, toolbar on screen, scroll restored', abs(mk[0] - 640) < 30 and abs(mk[1] - 360) < 30 and 0 < barb <= 720 and pg.evaluate('scrollY') == 1690, (mk, barb, pg.evaluate('scrollY')))
+    ctx.close()
+
+    # v0.3.5 (review): thumbnails scrolled out of view are unloaded
+    manyp = os.path.join(TMP, 'many.html')
+    with open(manyp, 'w') as f:
+        f.write('<!doctype html><title>Many</title><main data-hdek data-width="1280" data-height="720">' + ''.join(f'<section data-slide="s{i}"><h1>Slide {i}</h1></section>' for i in range(60)) +
+                '</main><script src="' + os.path.join(ROOT, 'skills/deckwright/runtime/deckwright-runtime.js') + '" data-hdek-runtime></script>')
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
+    pg.goto(url(manyp)); pg.wait_for_timeout(400); pg.keyboard.press('g'); pg.wait_for_timeout(1500)
+    sr = "document.querySelector('.hdek-ui-host').shadowRoot"
+    for _ in range(6): pg.evaluate(sr + ".querySelector('.hdg-cards').scrollBy(0, 400)"); pg.wait_for_timeout(500)
+    nf = pg.evaluate(sr + ".querySelectorAll('.hdg-th iframe').length"); first = pg.evaluate(sr + ".querySelectorAll('.hdg-card')[0].querySelector('iframe') === null")
+    check('overview keeps only thumbnails near the screen alive', nf <= 24 and first, (nf, first))
+    ctx.close()
+
+    # v0.3.5 (review): ink on a large HiDPI screen keeps full resolution
+    ctx = browser.new_context(viewport={'width': 2560, 'height': 1440}, device_scale_factor=2); pg = ctx.new_page()
+    pg.goto(url(os.path.join(DIST, 'demo.html'))); pg.wait_for_timeout(500)
+    cw = pg.evaluate("document.querySelector('.hdek-ink').width")
+    check('audience ink canvas is not capped (2560 px at 2×)', cw == 5120, cw)
     ctx.close()
     # deck CSS must not reach the runtime UI
     ctx = browser.new_context(viewport={'width': 1280, 'height': 720}); pg = ctx.new_page()
@@ -404,7 +457,12 @@ with open(rj, 'w', encoding='utf-8') as f: f.write(rt.replace('runtime v' + ver,
 r1 = cli('update', ud, '--dry-run')
 with open(dw, encoding='utf-8') as f: still_old = 'runtime v0.1.0' in f.read()
 check('update --dry-run lists old files and writes nothing', r1.returncode == 0 and '0.1.0 → ' in r1.stdout and '0.2.0 → ' in r1.stdout and still_old, r1.stdout)
+import shutil as _sh
+_sh.copy(os.path.join(ROOT, 'skills/deckwright/player.html'), os.path.join(ud, 'player.html'))
+with open(os.path.join(ud, 'player.html'), encoding='utf-8') as f: player_before = f.read()
 r2 = cli('update', ud); r3 = cli('update', ud)
+with open(os.path.join(ud, 'player.html'), encoding='utf-8') as f: player_after = f.read()
+check('update never touches the player (it only mentions the runtime tag in its code)', player_before == player_after and 'player.html' not in r2.stdout, r2.stdout)
 with open(dw, encoding='utf-8') as f: a_ = f.read()
 with open(os.path.join(ud, 'fresh.html'), encoding='utf-8') as f: b_ = f.read()
 check('update rewrites them like a fresh inject, and a second run changes nothing', r2.returncode == 0 and a_ == b_ and 'Updated 0' in r3.stdout and '3 already current' in r3.stdout, (r2.stdout, r3.stdout))

@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/grotyx/deckwright/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/grotyx/deckwright/tests.yml?style=flat-square&color=111111&label=tests" alt="Tests"></a>
-  <img src="https://img.shields.io/badge/version-0.3.4-111111?style=flat-square" alt="Version 0.3.4">
+  <img src="https://img.shields.io/badge/version-0.3.5-111111?style=flat-square" alt="Version 0.3.5">
   <img src="https://img.shields.io/badge/node-18%2B-111111?style=flat-square" alt="Node 18+">
   <img src="https://img.shields.io/badge/runs%20in-any%20browser-111111?style=flat-square" alt="Runs in any browser">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT">
@@ -199,7 +199,7 @@ Effects, JS hooks for counters and charts, events, the `.hdek` format and how ot
 
 [User guide](docs/manual.md) &middot; [Spec (hdek/1)](SPEC.md) &middot; [Skill instructions](skills/deckwright/SKILL.md) &middot; [Changelog](CHANGELOG.md)
 
-Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 121 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
+Development: `npm run build` rebuilds the player, demo and skill zip; `npm test` runs 127 checks in Chromium and on the CLI, including regression tests for every defect found in code review (Playwright for Python, `pdfplumber`, `python-pptx`).
 
 ## Author
 

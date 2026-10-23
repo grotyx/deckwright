@@ -1,4 +1,4 @@
-/*! DeckWright runtime v0.3.4 (.hdek) | MIT License | https://github.com/grotyx/deckwright
+/*! DeckWright runtime v0.3.5 (.hdek) | MIT License | https://github.com/grotyx/deckwright
  *  Present any HTML deck like PowerPoint: steps, presenter view, ink, blackout, print.
  *  Put this file inside an HTML deck as <script data-hdek-runtime> and it just works.
  */
@@ -7,7 +7,7 @@
   if ((window.DeckWright && window.DeckWright.__runtime) || (window.HDeck && window.HDeck.__runtime)) return;
 
   var PRODUCT = 'DeckWright';
-  var VERSION = '0.3.4';
+  var VERSION = '0.3.5';
   var api = window.DeckWright = window.HDeck = window.DeckWright || window.HDeck || {};
   var ROLE = /^hdek-preview/.test(window.name || '') ? 'preview' : 'audience';
 
@@ -747,7 +747,7 @@
   function inkBox() {
     var el = D.staged ? D.root : (D.slides[D.state.slide] && D.slides[D.state.slide].el);
     var r = el && el !== document.body ? unzoom(el.getBoundingClientRect()) : null;
-    if (!r || r.width < 50 || r.height < 50 || D.mode === 'single') r = { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight };
+    if (!r || r.width < 50 || r.height < 50 || D.mode === 'single') r = { left: zoomScroll ? zoomScroll.x : 0, top: zoomScroll ? zoomScroll.y : 0, width: window.innerWidth, height: window.innerHeight };
     return r;
   }
 
@@ -755,6 +755,8 @@
   // zoomRect is the part of the slide that fills the screen, in slide fractions {x, y, w, h}; null = not zoomed.
   // The whole page is scaled (so ink and everything on the slide follow); the toolbar is scaled back.
   var zoomRect = null, uiHost = null, uiRoot = null, zoomBand = null;
+  // Under a transformed <html>, fixed elements stop following the scroll, so the page is zoomed from scroll 0 and the scroll is restored afterwards
+  var zoomScroll = null;
   var FULL = { x: 0, y: 0, w: 1, h: 1 };
   var ZOOM_EASE = 'transform .28s cubic-bezier(.2,.7,.2,1)';
   function htmlMatrix() {
@@ -788,15 +790,28 @@
     var html = document.documentElement, st = html.style, tr = instant ? 'none' : ZOOM_EASE, hs = uiHost && uiHost.style;
     if (!zoomRect) {
       if (!st.transform && !html.classList.contains('hdek-zoomed')) return;
+      var back = zoomScroll; zoomScroll = null;
+      if (back && (back.x || back.y)) tr = 'none';
       st.transition = tr; st.transform = ''; html.classList.remove('hdek-zoomed');
-      if (hs) { hs.transition = tr; hs.transform = ''; }
+      if (hs) { hs.transition = tr; hs.transform = ''; hs.width = hs.height = hs.right = hs.bottom = ''; }
+      if (back && (back.x || back.y)) { try { window.scrollTo(back.x, back.y); } catch (e) { } }
+      positionInk();
       return;
+    }
+    if (!zoomScroll) {
+      zoomScroll = { x: window.scrollX || window.pageXOffset || 0, y: window.scrollY || window.pageYOffset || 0 };
+      if (zoomScroll.x || zoomScroll.y) { try { window.scrollTo(0, 0); } catch (e) { } }
     }
     var b = inkBox(), X = zoomXform(zoomRect, b, window.innerWidth, window.innerHeight);
     html.classList.add('hdek-zoomed');
     st.transformOrigin = '0 0'; st.transition = tr;
     st.transform = 'translate(' + X.tx + 'px,' + X.ty + 'px) scale(' + X.z + ')';
-    if (hs) { hs.transformOrigin = '0 0'; hs.transition = tr; hs.transform = 'scale(' + (1 / X.z) + ') translate(' + (-X.tx) + 'px,' + (-X.ty) + 'px)'; }
+    if (hs) {
+      // the zoomed page becomes the toolbar layer's containing block, so give it the window's size explicitly
+      hs.right = hs.bottom = 'auto'; hs.width = window.innerWidth + 'px'; hs.height = window.innerHeight + 'px';
+      hs.transformOrigin = '0 0'; hs.transition = tr; hs.transform = 'scale(' + (1 / X.z) + ') translate(' + (-X.tx) + 'px,' + (-X.ty) + 'px)';
+    }
+    positionInk();
   }
   function setZoom(r, instant) {
     if (!r && !zoomRect) return;
@@ -866,7 +881,7 @@
   function Ink(canvas, boxFn) { this.c = canvas; this.box = boxFn; }
   Ink.prototype.size = function () {
     var b = this.box(), dpr = Math.min(2, (window.devicePixelRatio || 1) * (b.scale || 1));
-    dpr *= Math.min(1, 4096 / Math.max(1, b.w * dpr, b.h * dpr)); // a zoomed presenter canvas can get very large
+    if (this.capped) dpr *= Math.min(1, 4096 / Math.max(1, b.w * dpr, b.h * dpr)); // the zoomed presenter canvas can get very large
     var w = Math.max(1, Math.round(b.w * dpr)), h = Math.max(1, Math.round(b.h * dpr));
     if (this.c.width !== w || this.c.height !== h) { this.c.width = w; this.c.height = h; }
     return { w: w, h: h };
@@ -1085,7 +1100,7 @@
       var b = e.target.closest('button'); if (!b) return;
       e.stopPropagation();
       if (b.dataset.color) { D.color = b.dataset.color; if (!D.tool || D.tool === 'laser' || D.tool === 'eraser') setTool('pen'); else updateBar(); Presenter.toolChanged(); return; }
-      action(b.dataset.act);
+      action(b.dataset.act, e);
     });
     uiRoot.appendChild(bar);
     toastEl = document.createElement('div'); toastEl.className = 'hdek-ui hdek-toast'; uiRoot.appendChild(toastEl);
@@ -1233,8 +1248,7 @@
         break;
       case 'media': {
         var ms = currentMedia();
-        if (!ms.length) toast(T('이 슬라이드에는 영상이 없습니다', 'No video on this slide'));
-        else togglePlay(ms[0]);
+        if (ms.length) togglePlay(ms[0]);
         break;
       }
       case 'resume': if (resumeOffer) { var ro = resumeOffer; resumeOffer = null; go(ro.slide, ro.step, false); Presenter.update(); } break;
@@ -1265,7 +1279,7 @@
       case 'c': case 'C': return 'clear';
       case 'z': case 'Z': return 'zoom';
       case 'g': case 'G': return 'grid';
-      case 'k': case 'K': return 'media';
+      case 'k': case 'K': return currentMedia().length ? 'media' : null; // otherwise the key stays the deck's
       case 'r': case 'R': return resumeOffer ? 'resume' : null; // otherwise the key stays the deck's
       case '?': return 'help';
     }
@@ -1299,7 +1313,7 @@
   function handleKey(e) {
     if (e.__hdek) return;
     var g = gridFor(e);
-    if (g) { g.key(e); return; } // the overview has the keyboard (search box, arrows, Enter, Esc)
+    if (g) { g.key(e); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); return; } // the overview has the keyboard; the deck gets none of it (typing still reaches the search box)
     // clickers send PageUp/PageDown: they must work even while a text field has focus
     if (isTyping(e.target) && e.key !== 'PageDown' && e.key !== 'PageUp') return;
     var k = e.key;
@@ -1355,6 +1369,7 @@
   var wheelLock = 0, wheelAcc = 0, inkClickBlock = 0;
   function bindInput() {
     window.addEventListener('keydown', handleKey, true);
+    ['keyup', 'keypress'].forEach(function (t) { window.addEventListener(t, function (e) { if (audGrid && audGrid.isOpen()) e.stopImmediatePropagation(); }, true); });
     // Capture phase: a click anywhere on the slide moves forward, and the deck's own click handler must not
     // also act (many AI decks go back when the left third is clicked; in a talk a click should always advance).
     // Buttons, links and other interactive elements keep working as the deck intended.
@@ -1544,6 +1559,7 @@
       // ink on presenter
       var pc = doc.createElement('canvas'); pc.className = 'pink'; els.curbox.appendChild(pc);
       inkP = new Ink(pc, function () { var r = pc.getBoundingClientRect(); return { w: r.width || 1, h: r.height || 1, scale: 1 }; });
+      inkP.capped = true;
       els.pink = pc;
       bindDraw(pc, w);
       w.addEventListener('message', onMsg);
@@ -2067,8 +2083,20 @@
     }
     return out.replace(/\s+/g, ' ').trim();
   }
+  // Each thumbnail is the whole deck loaded again, so heavy decks (big inline videos) get fewer live thumbnails
+  function thumbBudget() {
+    var n = 0;
+    try {
+      if (window.__HDEK_SRCDOC__) n = window.__HDEK_SRCDOC__.length;
+      else {
+        $$('[src^="data:"], [href^="data:"], [poster^="data:"]').forEach(function (e) { n += (e.getAttribute('src') || e.getAttribute('href') || e.getAttribute('poster') || '').length; });
+        $$('style').forEach(function (st) { n += (st.textContent || '').length; });
+      }
+    } catch (e) { }
+    return clamp(Math.floor(400e6 / Math.max(n, 16e6)), 2, 24);
+  }
   function SlideGrid(doc, mount, win) {
-    var root = null, list = null, q = null, nEl = null, cards = [], frames = [], waiting = [], loading = 0, sel = -1, io = null, hay = null, a = null;
+    var root = null, list = null, q = null, nEl = null, cards = [], frames = [], waiting = [], loading = 0, sel = -1, io = null, hay = null, a = null, cap = 24;
     function haystack() {
       if (hay) return hay;
       var norm = function (s) { return (s.normalize ? s.normalize('NFC') : s); };
@@ -2090,6 +2118,11 @@
         T('찾을 말 (제목 · 본문 · 노트) 또는 슬라이드 번호', 'Search titles, text and notes, or type a slide number') + '"><span class="hdg-n"></span><span class="hdg-sp"></span>' +
         '<button class="hdg-x">' + T('닫기 (Esc)', 'Close (Esc)') + '</button></div><div class="hdg-cards"></div>';
       mount.appendChild(root);
+      cap = thumbBudget();
+      // nothing done inside the overview reaches the deck underneath (its own click, wheel or pointer handlers)
+      ['click', 'dblclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup', 'pointermove', 'wheel', 'contextmenu', 'touchstart', 'touchend', 'keydown', 'keyup', 'keypress', 'input'].forEach(function (t) {
+        root.addEventListener(t, function (e) { e.stopPropagation(); }, t === 'wheel' || t.indexOf('touch') === 0 ? { passive: true } : false);
+      });
       q = root.querySelector('.hdg-q'); list = root.querySelector('.hdg-cards'); nEl = root.querySelector('.hdg-n');
       cards = D.slides.map(function (s, i) {
         var c = doc.createElement('div');
@@ -2107,7 +2140,8 @@
       win.addEventListener('resize', scale);
       // thumbnails load only when they scroll into view, a few at a time
       try {
-        io = new win.IntersectionObserver(function (es) { es.forEach(function (en) { if (en.isIntersecting) want(+en.target.dataset.i); }); }, { root: list, rootMargin: '300px 0px' });
+        // thumbnails exist only while near the screen: scrolled-away ones are removed again
+        io = new win.IntersectionObserver(function (es) { es.forEach(function (en) { var i = +en.target.dataset.i; if (en.isIntersecting) want(i); else drop(i); }); }, { root: list, rootMargin: '200px 0px' });
         cards.forEach(function (c) { io.observe(c); });
       } catch (e) { io = null; }
       filter();
@@ -2135,8 +2169,18 @@
       if (frames[i] || waiting.indexOf(i) >= 0) return;
       waiting.push(i); pump();
     }
+    function live() { var n = 0; frames.forEach(function (f) { if (f) n++; }); return n; }
+    function drop(i) {
+      var w = waiting.indexOf(i); if (w >= 0) waiting.splice(w, 1);
+      var r = frames[i]; if (!r) return;
+      clearTimeout(r.timer);
+      if (!r.done) loading = Math.max(0, loading - 1);
+      try { r.f.remove(); } catch (e) { }
+      frames[i] = null;
+      pump();
+    }
     function pump() {
-      while (root && loading < 3 && waiting.length) {
+      while (root && loading < 3 && waiting.length && live() < cap) {
         var i = waiting.shift();
         if (frames[i] || !cards[i] || cards[i].hidden) continue;
         var f = doc.createElement('iframe');
@@ -2189,6 +2233,7 @@
       cards.forEach(function (c, i) {
         var ok = !toks.length || i === num || toks.every(function (t) { return H[i].low.indexOf(t) >= 0; });
         c.hidden = !ok;
+        if (!ok) drop(i);
         c.lastChild.innerHTML = ok && toks.length ? snippet(H[i], toks) : '';
         if (ok) { shown++; if (first < 0) first = i; }
       });
